@@ -147,9 +147,9 @@ SQLite or no live database is enough for testing generated SQLAlchemy models.
 
 ---
 
-## AI Engineer 1 Task Focus
+## Task Focus
 
-AI Engineer 1 should focus on these files:
+ should focus on these files:
 
 ```text
 parser/sql_parser.py
@@ -378,123 +378,4 @@ class Customer(Base):
     status: Mapped[int] = mapped_column(Integer)
 ```
 
----
-
-## Do Not Build Now
-
-Do not add:
-
-- PostgreSQL
-- PostgreSQL MCP
-- watsonx.ai runtime
-- Live database connection
-- Docker
-- Authentication
-- Full SQL dialect support
-- Stored procedure migration
-- Trigger migration
-- View migration
-- Full ERD diagram generation
-
-Keep the MVP simple and demo-ready.
-
----
-
-## Coding Rules
-
-- Keep code simple.
-- Keep functions small.
-- Do not overengineer.
-- Do not rewrite the whole UI.
-- Add docstrings for important functions.
-- Add tests for parser and normalizer.
-- Make generated code importable.
-- Make generated pytest tests runnable.
-
----
-
-## Final Demo Checklist
-
-Before submission, confirm:
-
-```text
-[x] Streamlit app runs
-[x] SQL file upload works
-[x] Example SQL parses correctly
-[x] Clean table names look correct
-[x] Clean column names look correct
-[x] Generated models.py imports Base correctly
-[x] No duplicate column names
-[x] Generated test_models.py runs with pytest
-[x] ZIP download works
-[x] README is updated
-[x] modernization_report.md is generated
-[ ] bob_sessions folder exists
-[ ] Bob session markdown exports are added
-[ ] Bob session screenshots are added
-[x] No API keys or credentials are committed
-```
-
-**Implementation Status:** ✅ All core functionality completed and tested.
-
-**Remaining Tasks for Submission:**
-- Export Bob session reports to `bob_sessions/` folder
-- Add screenshots of Bob task consumption summaries
-
----
-
-## Submission Reminder
-
-Before final submission:
-
-- Use Bob IDE for project work.
-- Export relevant Bob task session reports.
-- Take screenshots of Bob task session consumption summaries.
-- Put exported markdown files and screenshots into `bob_sessions/`.
-- Do not commit credentials, API keys, or private data.
-
-## IBM watsonx.ai AI Assistant
-
-Add these instructions:
-
-LegacyLink AI may include an optional AI Assistant powered by IBM watsonx.ai.
-
-The assistant is not a trained custom model. It uses the selected watsonx.ai foundation model at runtime to answer user questions using the current generated project context.
-
-The assistant should be able to:
-- answer questions about parsed schema tables and columns
-- explain generated SQLAlchemy ORM models
-- explain legacy naming changes
-- summarize the generated modernization report when the user asks
-
-Important:
-- Do not call this an IBM Bob runtime chatbot.
-- IBM Bob is the development partner inside Bob IDE.
-- IBM watsonx.ai is the optional runtime inference provider.
-- Do not train or fine-tune any model.
-- Do not create a separate summarization model.
-- Use ibm/granite-4-h-small as the default model because it is marked Ready to use.
-- Do not use models marked Not yet deployed.
-- Do not hardcode API keys.
-- Use Streamlit st.secrets only.
-- Do not use .env or python-dotenv unless really necessary.
-- The app must still work if watsonx.ai credentials are missing.
-
-Required local secrets:
-
-WATSONX_API_KEY
-WATSONX_PROJECT_ID
-WATSONX_URL
-WATSONX_MODEL_ID
-
-Do not commit:
-- .streamlit/secrets.toml
-- .env
-- API keys
-- IBM Cloud credentials
-
-Do not rewrite the Streamlit UI.
-Do not change assets or DESIGN.md.
-Do not break the existing upload → generated ZIP → pytest flow.
-
-After updating AGENTS.md, summarize the exact section added.
+Made with Bob

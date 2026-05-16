@@ -20,6 +20,7 @@ from services.watsonx_client import (
     build_report_context,
     get_watsonx_credentials
 )
+from services.audit_logger import log_ai_assistant_interaction
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -694,6 +695,7 @@ if view == "modernize":
                         st.session_state.generated_files     = result["files"]
                         st.session_state.zip_data            = result["zip_data"]
                         st.session_state.transformation_log  = result["transformation_log"]
+                        st.session_state.sql_filename        = uploaded_file.name  # Store filename for audit logging
                         st.session_state.stats = {
                             "table_count":          result["table_count"],
                             "column_count":         result["column_count"],
@@ -1380,6 +1382,36 @@ if view == "modernize":
                             # Ask watsonx.ai
                             response = ask_watsonx(user_question, full_context)
                             st.session_state.ai_response = response
+                            
+                            # Log to PostgreSQL audit if enabled
+                            if response and not response.startswith("⚠️"):
+                                # Determine source context type
+                                source_context = "schema"
+                                if any(word in question_lower for word in ['model', 'orm', 'class']):
+                                    source_context = "models"
+                                elif any(word in question_lower for word in ['report', 'summary']):
+                                    source_context = "report"
+                                elif any(word in question_lower for word in ['naming', 'transform']):
+                                    source_context = "transformations"
+                                
+                                # Get metadata
+                                sql_filename = st.session_state.get("sql_filename", "")
+                                table_count = st.session_state.stats.get("table_count", 0) if st.session_state.stats else 0
+                                model_id = st.secrets.get("WATSONX_MODEL_ID", "ibm/granite-4-h-small")
+                                
+                                # Log interaction
+                                success, message = log_ai_assistant_interaction(
+                                    question=user_question,
+                                    answer=response,
+                                    source_context=source_context,
+                                    sql_filename=sql_filename,
+                                    table_count=table_count,
+                                    model_id=model_id,
+                                    status="success"
+                                )
+                                
+                                # Store audit status for display
+                                st.session_state.audit_log_status = (success, message)
                     
                     # Display response
                     if st.session_state.ai_response:
@@ -1405,6 +1437,28 @@ if view == "modernize":
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
+                        
+                        # Display audit log status if available
+                        if hasattr(st.session_state, 'audit_log_status'):
+                            success, message = st.session_state.audit_log_status
+                            if success and "saved to PostgreSQL" in message:
+                                st.markdown("""
+                                <div style='margin-top:8px;padding:8px;background:rgba(16,185,129,0.08);
+                                            border-left:2px solid #10B981;border-radius:2px;'>
+                                    <div style='color:#849495;font-size:10px;line-height:1.5;'>
+                                        ✓ <strong>Audit log saved to PostgreSQL</strong>
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            elif not success and message:
+                                st.markdown(f"""
+                                <div style='margin-top:8px;padding:8px;background:rgba(239,68,68,0.08);
+                                            border-left:2px solid #EF4444;border-radius:2px;'>
+                                    <div style='color:#849495;font-size:10px;line-height:1.5;'>
+                                        ⚠ <strong>Audit logging:</strong> {message}
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
 
             # Download full zip
             st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)

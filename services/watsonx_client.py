@@ -152,14 +152,23 @@ def build_transformation_context(transformation_log: list) -> str:
     
     context = "## Naming Transformations Applied\n\n"
     
-    # Group by type
-    table_transforms = [t for t in transformation_log if t['type'] == 'Table']
-    column_transforms = [t for t in transformation_log if t['type'] == 'Column']
+    # Group by type (safe access with .get())
+    table_transforms = [t for t in transformation_log if t.get('type') == 'Table']
+    column_transforms = [t for t in transformation_log if t.get('type') == 'Column']
     
     if table_transforms:
         context += "**Table Name Transformations:**\n"
         for t in table_transforms[:5]:  # Show first 5
-            context += f"- `{t['original']}` → `{t['normalized']}`: {t['change']}\n"
+            original = t.get('original', 'unknown')
+            normalized = t.get('normalized')
+            change = t.get('change', 'no description')
+            
+            # If normalized exists, show full transformation
+            if normalized:
+                context += f"- `{original}` → `{normalized}`: {change}\n"
+            else:
+                # If normalized is missing, show only original: change
+                context += f"- `{original}`: {change}\n"
         if len(table_transforms) > 5:
             context += f"- ... and {len(table_transforms) - 5} more\n"
         context += "\n"
@@ -167,7 +176,16 @@ def build_transformation_context(transformation_log: list) -> str:
     if column_transforms:
         context += "**Column Name Transformations:**\n"
         for t in column_transforms[:10]:  # Show first 10
-            context += f"- `{t['original']}` → `{t['normalized']}`: {t['change']}\n"
+            original = t.get('original', 'unknown')
+            normalized = t.get('normalized')
+            change = t.get('change', 'no description')
+            
+            # If normalized exists, show full transformation
+            if normalized:
+                context += f"- `{original}` → `{normalized}`: {change}\n"
+            else:
+                # If normalized is missing, show only original: change
+                context += f"- `{original}`: {change}\n"
         if len(column_transforms) > 10:
             context += f"- ... and {len(column_transforms) - 10} more\n"
         context += "\n"
