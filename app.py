@@ -730,6 +730,11 @@ if view == "modernize":
         tables = st.session_state.parsed_tables
         stats  = st.session_state.stats
         tlog   = st.session_state.transformation_log
+        
+        # Calculate actual statistics from parsed data
+        total_columns = sum(len(t["columns"]) for t in tables)
+        total_pks = sum(1 for t in tables for c in t["columns"] if c.get("primary_key"))
+        total_fks = sum(1 for t in tables for c in t["columns"] if c["clean_name"].endswith("_id") and not c.get("primary_key"))
 
         if not all([files, tables]):
             st.error("Session data missing — please upload and process a SQL file.")
@@ -907,7 +912,7 @@ if view == "modernize":
                             <div class='cyber-panel-header'>
                                 <span style='color:#849495;font-size:11px;
                                              letter-spacing:0.1em;font-weight:700;'>
-                                    {{}} &nbsp;TABLE_INSPECTOR
+                                    ⚙ &nbsp;TABLE_INSPECTOR
                                 </span>
                             </div>
                             <div style='padding:16px;'>
@@ -1158,12 +1163,13 @@ if view == "modernize":
                     </div>
                     """, unsafe_allow_html=True)
 
-                # Transformation Log
+                # Transformation Log (using actual transformation log data)
                 st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
 
                 log_rows_html = ""
-                source_tables = tables[:6] if tables else []
-                for t in source_tables:
+                
+                # Show table transformations
+                for t in tables[:6]:
                     log_rows_html += f"""
                     <tr>
                         <td>
@@ -1176,7 +1182,7 @@ if view == "modernize":
                             <div style='color:#EF4444;font-size:12px;font-weight:600;
                                         margin-bottom:2px;'>{t['original_name']}</div>
                             <div style='color:#849495;font-size:11px;'>
-                                Table · Pattern: Legacy Naming
+                                Table · Legacy Naming Pattern
                             </div>
                         </td>
                         <td style='color:#849495;font-size:16px;text-align:center;'>→</td>
@@ -1184,11 +1190,42 @@ if view == "modernize":
                             <div style='color:#10B981;font-size:12px;font-weight:600;
                                         margin-bottom:2px;'>{t['clean_name']}</div>
                             <div style='color:#849495;font-size:11px;'>
-                                + Semantic resolution applied
+                                Class: {t['clean_name']} | Table: {t['table_name']}
                             </div>
                         </td>
                     </tr>
                     """
+                
+                # Show column transformations from first table
+                if tables and len(tables[0]["columns"]) > 0:
+                    first_table_cols = tables[0]["columns"][:5]  # Show first 5 columns
+                    for col in first_table_cols:
+                        if col['original_name'] != col['clean_name']:
+                            log_rows_html += f"""
+                            <tr>
+                                <td>
+                                    <div style='width:28px;height:28px;border:1px solid #3B82F6;
+                                                display:flex;align-items:center;justify-content:center;'>
+                                        <span style='color:#3B82F6;font-size:14px;'>✓</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style='color:#F59E0B;font-size:12px;font-weight:600;
+                                                margin-bottom:2px;'>{col['original_name']}</div>
+                                    <div style='color:#849495;font-size:11px;'>
+                                        Column · {tables[0]['original_name']}
+                                    </div>
+                                </td>
+                                <td style='color:#849495;font-size:16px;text-align:center;'>→</td>
+                                <td>
+                                    <div style='color:#3B82F6;font-size:12px;font-weight:600;
+                                                margin-bottom:2px;'>{col['clean_name']}</div>
+                                    <div style='color:#849495;font-size:11px;'>
+                                        Type: {col['type']} | Normalized
+                                    </div>
+                                </td>
+                            </tr>
+                            """
 
                 st.markdown(f"""
                 <div class='cyber-panel'>
