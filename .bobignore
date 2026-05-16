@@ -1,0 +1,46 @@
+# Secrets and credentials
+.env
+.streamlit/secrets.toml
+**/secrets.toml
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+config/credentials.json
+ibm-credentials.env
+
+# Bob internal files
+.bob/
+
+# Python cache and test cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Git internals
+.git/
+
+# Generated outputs
+generated_project/
+legacylink_project*/
+*.zip
+
+# Local logs
+logs/
+*.log
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Made with Bob
