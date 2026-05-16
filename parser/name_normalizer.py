@@ -35,14 +35,7 @@ class NameNormalizer:
             'EMP': 'Employee',
             'MGR': 'Manager',
             
-            # Column prefixes
-            'vch_': '',
-            'int_': '',
-            'dec_': '',
-            'dt_': '',
-            'fk_': '',
-            'c_': '',
-            'str_': '',
+            # Column prefixes (removed from here, handled separately)
             
             # Common column abbreviations
             'fname': 'first_name',
@@ -57,9 +50,11 @@ class NameNormalizer:
             'cust': 'customer',
             'ord': 'order',
             'prod': 'product',
+            'str': 'store',
         }
         
         self.transformation_log = []
+        self.used_column_names = set()
     
     def normalize_table_name(self, table_name: str) -> str:
         """
@@ -127,32 +122,89 @@ class NameNormalizer:
         original = column_name
         cleaned = column_name.lower()
         
-        # Remove common prefixes
-        for prefix in ['vch_', 'int_', 'dec_', 'dt_', 'fk_', 'c_', 'str_']:
+        # Step 1: Handle explicit special cases FIRST (before prefix removal)
+        # Timestamp patterns with dt_ prefix
+        if cleaned == 'dt_upd_dt':
+            result = 'updated_at'
+            self._log_transformation(original, f"Special case: {cleaned} → {result}", is_column=True)
+            return self._ensure_unique_column_name(result, original)
+        elif cleaned == 'dt_crt_dt':
+            result = 'created_at'
+            self._log_transformation(original, f"Special case: {cleaned} → {result}", is_column=True)
+            return self._ensure_unique_column_name(result, original)
+        elif cleaned == 'dt_ord_dt':
+            result = 'ordered_at'
+            self._log_transformation(original, f"Special case: {cleaned} → {result}", is_column=True)
+            return self._ensure_unique_column_name(result, original)
+        
+        # Step 2: Remove type prefixes but keep the semantic part
+        prefix_removed = None
+        for prefix in ['vch_', 'int_', 'dec_', 'dt_']:
             if cleaned.startswith(prefix):
                 cleaned = cleaned[len(prefix):]
-                self._log_transformation(original, f"Removed prefix: {prefix}", is_column=True)
+                prefix_removed = prefix
+                self._log_transformation(original, f"Removed type prefix: {prefix}", is_column=True)
+                break
         
-        # Handle special cases for timestamps
+        # Step 3: Handle foreign key prefix specially - remove fk_ but keep the rest
+        if cleaned.startswith('fk_'):
+            cleaned = cleaned[3:]  # Remove 'fk_' prefix
+            self._log_transformation(original, f"Removed FK prefix, keeping: {cleaned}", is_column=True)
+            # Now expand the remaining part
+            # e.g., 'str_id' -> 'store_id', 'cust_id' -> 'customer_id'
+        
+        # Step 4: Handle primary key column prefix (c_, str_, ord_)
+        # These should become just 'id'
+        if cleaned in ['c_id', 'id']:
+            result = 'id'
+            self._log_transformation(original, f"Primary key: {cleaned} → {result}", is_column=True)
+            return self._ensure_unique_column_name(result, original)
+        
+        # For table-specific IDs like str_id, ord_id - these are primary keys, make them 'id'
+        if cleaned in ['str_id', 'ord_id', 'cust_id'] and not original.lower().startswith('fk_'):
+            result = 'id'
+            self._log_transformation(original, f"Primary key: {cleaned} → {result}", is_column=True)
+            return self._ensure_unique_column_name(result, original)
+        
+        # Step 5: Handle remaining timestamp patterns
         if cleaned.endswith('_dt'):
             cleaned = cleaned[:-3]  # Remove '_dt' suffix
-            if cleaned.endswith('_upd'):
-                cleaned = 'updated_at'
-            elif cleaned.endswith('_crt'):
-                cleaned = 'created_at'
-            elif cleaned.endswith('_ord'):
-                cleaned = 'ordered_at'
+            if cleaned in ['upd', 'update']:
+                result = 'updated_at'
+            elif cleaned in ['crt', 'create']:
+                result = 'created_at'
+            elif cleaned in ['ord', 'order']:
+                result = 'ordered_at'
             else:
-                cleaned = cleaned + '_at'
-            self._log_transformation(original, f"Converted to timestamp: {cleaned}", is_column=True)
-            return cleaned
+                result = cleaned + '_at'
+            self._log_transformation(original, f"Converted to timestamp: {result}", is_column=True)
+            return self._ensure_unique_column_name(result, original)
         
-        # Handle ID columns
-        if cleaned == 'id' or cleaned.endswith('_id'):
-            self._log_transformation(original, f"Kept as: {cleaned}", is_column=True)
-            return cleaned
+        # Step 6: Handle ID columns (including foreign keys)
+        if cleaned.endswith('_id'):
+            # Split and expand the part before '_id'
+            base = cleaned[:-3]  # Remove '_id'
+            parts = base.split('_')
+            expanded_parts = []
+            
+            for part in parts:
+                if part in self.abbreviations:
+                    expanded = self.abbreviations[part]
+                    if expanded:
+                        expanded_parts.append(expanded)
+                        self._log_transformation(original, f"Expanded: {part} → {expanded}", is_column=True)
+                else:
+                    expanded_parts.append(part)
+            
+            if expanded_parts:
+                result = '_'.join(expanded_parts) + '_id'
+            else:
+                result = 'id'
+            
+            self._log_transformation(original, f"ID column: {cleaned} → {result}", is_column=True)
+            return self._ensure_unique_column_name(result, original)
         
-        # Split by underscore and expand abbreviations
+        # Step 7: Split by underscore and expand abbreviations for regular columns
         parts = cleaned.split('_')
         expanded_parts = []
         
@@ -172,7 +224,37 @@ class NameNormalizer:
             result = column_name.lower()
         
         self._log_transformation(original, f"Final column name: {result}", is_column=True)
-        return result
+        return self._ensure_unique_column_name(result, original)
+    
+    def _ensure_unique_column_name(self, name: str, original: str) -> str:
+        """
+        Ensure column name is unique within the current table context.
+        If duplicate, append a numeric suffix.
+        
+        Args:
+            name: Proposed column name
+            original: Original column name for logging
+            
+        Returns:
+            Unique column name
+        """
+        if name not in self.used_column_names:
+            self.used_column_names.add(name)
+            return name
+        
+        # Name is duplicate, find a unique suffix
+        counter = 2
+        while f"{name}_{counter}" in self.used_column_names:
+            counter += 1
+        
+        unique_name = f"{name}_{counter}"
+        self.used_column_names.add(unique_name)
+        self._log_transformation(original, f"Duplicate detected, renamed to: {unique_name}", is_column=True)
+        return unique_name
+    
+    def reset_column_context(self):
+        """Reset the used column names tracker for a new table"""
+        self.used_column_names.clear()
     
     def normalize_table_name_to_tablename(self, class_name: str) -> str:
         """

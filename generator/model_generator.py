@@ -3,7 +3,7 @@ SQLAlchemy Model Generator for LegacyLink AI
 Generates modern SQLAlchemy 2.0 ORM models from parsed schema
 """
 
-from typing import List, Dict
+from typing import List, Dict, Any
 
 
 class ModelGenerator:
@@ -48,8 +48,9 @@ class ModelGenerator:
     def _generate_imports(self, tables: List[Dict]) -> str:
         """Generate import statements based on used types"""
         imports = [
-            "from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase",
-            "from sqlalchemy import Integer, String, Text, DateTime, Date, Boolean, Numeric, Float"
+            "from sqlalchemy.orm import Mapped, mapped_column",
+            "from sqlalchemy import Integer, String, Text, DateTime, Date, Boolean, Numeric, Float",
+            "from database import Base"
         ]
         
         # Check if datetime is needed
@@ -59,7 +60,7 @@ class ModelGenerator:
         )
         
         if has_datetime:
-            imports.append("from datetime import datetime")
+            imports.insert(0, "from datetime import datetime")
         
         return '\n'.join(imports)
     

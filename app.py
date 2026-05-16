@@ -38,6 +38,10 @@ def process_sql_file(sql_content: str) -> dict | None:
         for table in tables:
             table["clean_name"] = normalizer.normalize_table_name(table["original_name"])
             table["table_name"] = normalizer.normalize_table_name_to_tablename(table["clean_name"])
+            
+            # Reset column context for each table to allow duplicate column names across tables
+            normalizer.reset_column_context()
+            
             for col in table["columns"]:
                 col["clean_name"] = normalizer.normalize_column_name(col["original_name"])
 
@@ -708,7 +712,7 @@ if view == "modernize":
                         // Waiting for input…
                     </div>
                     <div style='color:#10B981;margin-bottom:6px;'>&gt; SYSTEM_READY</div>
-                    <div style='color:#10B981;margin-bottom:6px;'>&gt; IBM_BOB_MODEL_LOADED</div>
+                    <div style='color:#10B981;margin-bottom:6px;'>&gt; IBM_BOB_ASSISTED_WORKFLOW_READY</div>
                     <div style='color:#10B981;margin-bottom:32px;'>&gt; AWAITING_LEGACY_SCHEMA</div>
                     <div style='margin-top:auto;padding-top:24px;
                                 border-top:1px solid #1E293B;opacity:0.7;'>
@@ -1336,7 +1340,7 @@ elif view == "support":
     """, unsafe_allow_html=True)
 
     for icon, title, detail in [
-        ("◈", "SYSTEM STATUS",  "All systems operational. IBM_BOB_MODEL: ONLINE"),
+        ("◈", "SYSTEM STATUS",  "All systems operational. IBM_BOB_ASSISTED_DEVELOPMENT: ENABLED"),
         ("◉", "VERSION",        "LegacyLink AI v2.0_STABLE — Parser v3.1 · Generator v2.4"),
         ("◎", "CONTACT",        "Submit a support ticket via the IBM Watsonx portal"),
     ]:
