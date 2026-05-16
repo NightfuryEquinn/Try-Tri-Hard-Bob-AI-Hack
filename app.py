@@ -29,6 +29,8 @@ def process_sql_file(sql_content: str) -> dict | None:
     try:
         parser = SQLParser()
         tables = parser.parse_sql_file(sql_content)
+        functions = parser.get_functions()
+        indexes = parser.get_indexes()
 
         if not tables:
             st.error("No tables found in SQL file. Please check the file format.")
@@ -55,7 +57,7 @@ def process_sql_file(sql_content: str) -> dict | None:
         report_gen           = ReportGenerator()
         readme               = report_gen.generate_readme(tables)
         modernization_report = report_gen.generate_modernization_report(
-            tables, normalizer.get_transformation_log()
+            tables, normalizer.get_transformation_log(), functions, indexes
         )
         requirements = report_gen.generate_requirements()
 
@@ -73,10 +75,14 @@ def process_sql_file(sql_content: str) -> dict | None:
 
         return {
             "tables":               tables,
+            "functions":            functions,
+            "indexes":              indexes,
             "files":                files,
             "zip_data":             zip_data,
             "table_count":          len(tables),
             "column_count":         sum(len(t["columns"]) for t in tables),
+            "function_count":       len(functions),
+            "index_count":          len(indexes),
             "transformation_count": len(tlog),
             "transformation_log":   tlog,
         }
@@ -681,12 +687,16 @@ if view == "modernize":
                     if result:
                         st.session_state.processed           = True
                         st.session_state.parsed_tables       = result["tables"]
+                        st.session_state.parsed_functions    = result.get("functions", [])
+                        st.session_state.parsed_indexes      = result.get("indexes", [])
                         st.session_state.generated_files     = result["files"]
                         st.session_state.zip_data            = result["zip_data"]
                         st.session_state.transformation_log  = result["transformation_log"]
                         st.session_state.stats = {
                             "table_count":          result["table_count"],
                             "column_count":         result["column_count"],
+                            "function_count":       result.get("function_count", 0),
+                            "index_count":          result.get("index_count", 0),
                             "transformation_count": result["transformation_count"],
                         }
                         st.rerun()
@@ -1071,6 +1081,20 @@ if view == "modernize":
                             <span style='color:#849495;font-size:13px;'>Columns Standardized</span>
                             <span style='color:#dce4e4;font-weight:700;font-size:15px;'>
                                 {stats['column_count']:,}
+                            </span>
+                        </div>
+                        <div style='display:flex;justify-content:space-between;
+                                    padding:12px 0;border-top:1px solid #2e3637;'>
+                            <span style='color:#849495;font-size:13px;'>Functions Found</span>
+                            <span style='color:#dce4e4;font-weight:700;font-size:15px;'>
+                                {stats.get('function_count', 0)}
+                            </span>
+                        </div>
+                        <div style='display:flex;justify-content:space-between;
+                                    padding:12px 0;border-top:1px solid #2e3637;'>
+                            <span style='color:#849495;font-size:13px;'>Indexes Found</span>
+                            <span style='color:#dce4e4;font-weight:700;font-size:15px;'>
+                                {stats.get('index_count', 0)}
                             </span>
                         </div>
                         <div style='padding:14px 0 0;border-top:1px solid #2e3637;'>

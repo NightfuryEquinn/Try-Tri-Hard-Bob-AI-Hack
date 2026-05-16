@@ -12,10 +12,15 @@ class SQLParser:
     
     def __init__(self):
         self.tables = []
+        self.functions = []
+        self.indexes = []
     
     def parse_sql_file(self, sql_content: str) -> List[Dict]:
         """
-        Parse SQL content and extract table definitions
+        Parse SQL content and extract table definitions, functions, and indexes
+        
+        Supports both CREATE TABLE and CREATE TABLE IF NOT EXISTS syntax.
+        Also extracts CREATE FUNCTION/PROCEDURE and CREATE INDEX statements.
         
         Args:
             sql_content: Raw SQL file content
@@ -24,13 +29,18 @@ class SQLParser:
             List of table dictionaries with metadata
         """
         self.tables = []
+        self.functions = []
+        self.indexes = []
         
-        # Remove comments
-        sql_content = self._remove_comments(sql_content)
+        # Store original content before removing comments for function body extraction
+        original_content = sql_content
         
-        # Extract CREATE TABLE statements
-        create_table_pattern = r'CREATE\s+TABLE\s+(\w+)\s*\((.*?)\);'
-        matches = re.finditer(create_table_pattern, sql_content, re.IGNORECASE | re.DOTALL)
+        # Remove comments for pattern matching
+        sql_content_clean = self._remove_comments(sql_content)
+        
+        # Extract CREATE TABLE statements (with or without IF NOT EXISTS)
+        create_table_pattern = r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s*\((.*?)\);'
+        matches = re.finditer(create_table_pattern, sql_content_clean, re.IGNORECASE | re.DOTALL)
         
         for match in matches:
             table_name = match.group(1)
@@ -42,6 +52,12 @@ class SQLParser:
             }
             
             self.tables.append(table_info)
+        
+        # Extract functions and procedures
+        self._parse_functions(original_content)
+        
+        # Extract indexes
+        self._parse_indexes(sql_content_clean)
         
         return self.tables
     
@@ -151,3 +167,75 @@ class SQLParser:
         return sum(len(table['columns']) for table in self.tables)
 
 # Made with Bob
+
+    
+    def _parse_functions(self, sql_content: str) -> None:
+        """
+        Extract CREATE FUNCTION and CREATE PROCEDURE statements
+        
+        Args:
+            sql_content: Raw SQL content (with comments preserved for context)
+        """
+        # Pattern for CREATE OR REPLACE FUNCTION/PROCEDURE
+        # Matches until the final $$ or END; delimiter
+        function_pattern = r'CREATE\s+(?:OR\s+REPLACE\s+)?(?:FUNCTION|PROCEDURE)\s+(\w+)\s*\((.*?)\)(.*?)(?:\$\$;|\bEND\s*;)'
+        
+        matches = re.finditer(function_pattern, sql_content, re.IGNORECASE | re.DOTALL)
+        
+        for match in matches:
+            function_name = match.group(1)
+            parameters = match.group(2).strip()
+            body_and_returns = match.group(3).strip()
+            
+            # Extract RETURNS clause if present
+            returns_match = re.search(r'RETURNS\s+(.*?)(?:LANGUAGE|AS)', body_and_returns, re.IGNORECASE | re.DOTALL)
+            returns_type = returns_match.group(1).strip() if returns_match else None
+            
+            # Extract LANGUAGE
+            language_match = re.search(r'LANGUAGE\s+(\w+)', body_and_returns, re.IGNORECASE)
+            language = language_match.group(1) if language_match else 'SQL'
+            
+            function_info = {
+                'name': function_name,
+                'parameters': parameters,
+                'returns': returns_type,
+                'language': language,
+                'type': 'function'
+            }
+            
+            self.functions.append(function_info)
+    
+    def _parse_indexes(self, sql_content: str) -> None:
+        """
+        Extract CREATE INDEX statements
+        
+        Args:
+            sql_content: SQL content with comments removed
+        """
+        # Pattern for CREATE INDEX or CREATE UNIQUE INDEX
+        index_pattern = r'CREATE\s+(?:(UNIQUE)\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s+ON\s+(\w+)\s*\((.*?)\)'
+        
+        matches = re.finditer(index_pattern, sql_content, re.IGNORECASE | re.DOTALL)
+        
+        for match in matches:
+            is_unique = match.group(1) is not None
+            index_name = match.group(2)
+            table_name = match.group(3)
+            columns = match.group(4).strip()
+            
+            index_info = {
+                'name': index_name,
+                'table': table_name,
+                'columns': columns,
+                'unique': is_unique
+            }
+            
+            self.indexes.append(index_info)
+    
+    def get_functions(self) -> List[Dict]:
+        """Get list of parsed functions"""
+        return self.functions
+    
+    def get_indexes(self) -> List[Dict]:
+        """Get list of parsed indexes"""
+        return self.indexes
