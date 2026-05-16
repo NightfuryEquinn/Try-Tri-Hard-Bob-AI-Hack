@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+.pytest_cache/
 
 # Virtual environments
 .env
@@ -30,5 +31,8 @@ Thumbs.db
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Bob
+.bob/
 
 # Made with Bob

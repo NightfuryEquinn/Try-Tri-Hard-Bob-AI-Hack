@@ -17,6 +17,7 @@ LegacyLink AI is a lightweight modernization tool that converts messy legacy SQL
 - 🧪 **Test Generation**: Create starter pytest test files
 - 📊 **Modernization Report**: Detailed explanation of all transformations
 - 📦 **ZIP Download**: Complete project scaffold ready to use
+- 💬 **AI Assistant**: IBM watsonx.ai-powered assistant to answer questions about your schema
 
 ## 🚀 Quick Start
 
@@ -51,7 +52,46 @@ streamlit run app.py
 2. **Review Parsed Schema**: Check the extracted tables and columns
 3. **Preview Generated Code**: See the clean SQLAlchemy models
 4. **Read Modernization Report**: Understand what was transformed
-5. **Download Project**: Get your complete Python ORM scaffold as a ZIP file
+5. **Ask AI Assistant**: Get help understanding your schema with IBM watsonx.ai
+6. **Download Project**: Get your complete Python ORM scaffold as a ZIP file
+
+## 💬 AI Assistant 
+
+LegacyLink AI includes an optional AI Assistant powered by **IBM watsonx.ai** that can answer questions about your modernized schema.
+
+### Setup
+
+To enable the AI Assistant, create a `.streamlit/secrets.toml` file with your IBM watsonx.ai credentials:
+
+```toml
+WATSONX_API_KEY = "your-api-key-here"
+WATSONX_PROJECT_ID = "your-project-id-here"
+WATSONX_URL = "https://us-south.ml.cloud.ibm.com"
+WATSONX_MODEL_ID = "ibm/granite-4-h-small"
+```
+
+### Getting IBM watsonx.ai Credentials
+
+1. Sign up for [IBM Cloud](https://cloud.ibm.com/)
+2. Create a watsonx.ai project
+3. Generate an API key from your IBM Cloud account
+4. Copy your project ID from the watsonx.ai project settings
+
+### Example Questions
+
+Once configured, you can ask the AI Assistant questions like:
+
+- "Explain this schema to a new developer"
+- "Which columns look like foreign keys?"
+- "What legacy naming patterns were fixed?"
+- "Summarize the modernization report"
+- "What should a developer review first?"
+
+The AI Assistant uses the **ibm/granite-4-h-small** foundation model to provide context-aware answers based on your parsed schema, generated models, and transformation log.
+
+### Note
+
+The AI Assistant is completely optional. LegacyLink AI works perfectly without it - you'll still get all the schema parsing, ORM generation, and downloadable project features.
 
 ## 🎨 Design System
 
@@ -120,9 +160,11 @@ class Customer(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 ```
 
-## 🤖 IBM Bob Integration
+## 🤖 IBM Bob & IBM watsonx.ai
 
-This project uses IBM Bob as the AI development partner throughout the build process:
+### IBM Bob (Development Partner)
+
+This project uses **IBM Bob** as the AI development partner throughout the build process:
 
 - Understanding project structure
 - Improving parsing logic
@@ -130,6 +172,15 @@ This project uses IBM Bob as the AI development partner throughout the build pro
 - Creating and improving tests
 - Enhancing documentation
 - Preparing final repository
+
+### IBM watsonx.ai (Runtime Inference)
+
+The optional AI Assistant feature uses **IBM watsonx.ai** foundation models at runtime to:
+
+- Answer user questions about parsed schemas
+- Explain generated ORM models
+- Summarize modernization reports
+- Help developers understand legacy transformations
 
 ## 🏆 Hackathon Alignment
 
