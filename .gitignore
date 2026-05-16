@@ -1,2 +1,3 @@
 .bob/
 logs/
+__pycache__/
