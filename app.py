@@ -811,7 +811,7 @@ if view == "modernize":
                         </tr>
                         """
 
-                    st.markdown(f"""
+                    st.html(f"""
                     <div class='cyber-panel'>
                         <div class='cyber-panel-header'>
                             <span style='color:#849495;font-size:11px;
@@ -837,7 +837,7 @@ if view == "modernize":
                             </table>
                         </div>
                     </div>
-                    """, unsafe_allow_html=True)
+                    """)
 
                 with right_panel:
                     if tables:
@@ -911,7 +911,7 @@ if view == "modernize":
                             </div>
                             """
 
-                        st.markdown(f"""
+                        st.html(f"""
                         <div class='cyber-panel'>
                             <div class='cyber-panel-header'>
                                 <span style='color:#849495;font-size:11px;
@@ -939,7 +939,7 @@ if view == "modernize":
                             </div>
                             {anomaly_html}
                         </div>
-                        """, unsafe_allow_html=True)
+                        """)
 
             # ══════════════════════════════════════════════════════════════════
             # TAB 2 — Generated ORM  (matches orm.png)
@@ -1231,7 +1231,7 @@ if view == "modernize":
                             </tr>
                             """
 
-                st.markdown(f"""
+                st.html(f"""
                 <div class='cyber-panel'>
                     <div class='cyber-panel-header'>
                         <span style='font-size:10px;letter-spacing:0.1em;
@@ -1260,7 +1260,7 @@ if view == "modernize":
                         </table>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """)
 
                 # Download full zip
                 st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
