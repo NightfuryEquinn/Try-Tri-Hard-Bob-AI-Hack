@@ -1921,10 +1921,9 @@ elif view == "support":
 st.markdown("""
 <div class='legacylink-footer'>
     <span style='color:#10B981;font-size:11px;letter-spacing:0.1em;font-weight:700;'>
-        MODERNIZATION_PROGRESS: 87% &nbsp;|&nbsp; SYSTEM_READY
+        100% Powered by IBM &nbsp;|&nbsp; Assisted with Bob &nbsp;|&nbsp; SYSTEM_READY
     </span>
     <span style='color:#849495;font-size:11px;letter-spacing:0.08em;'>
-        PRIVACY POLICY &nbsp;&nbsp;&nbsp; TERMS OF SERVICE
-    </span>
+        Developed by Try-Tri-Hard &nbsp;&nbsp;&nbsp; MIT Licensed
 </div>
 """, unsafe_allow_html=True)
