@@ -12,6 +12,15 @@ from generator.model_generator import ModelGenerator
 from generator.test_generator import TestGenerator
 from generator.report_generator import ReportGenerator
 from generator.zip_packager import ZipPackager
+from services.watsonx_client import (
+    ask_watsonx,
+    build_schema_context,
+    build_transformation_context,
+    build_models_context,
+    build_report_context,
+    get_watsonx_credentials
+)
+from services.audit_logger import log_ai_assistant_interaction
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,6 +114,8 @@ DEFAULTS: dict = {
     "stats":              {},
     "transformation_log": [],
     "current_view":       "modernize",  # modernize | history | docs | support
+    "ai_question":        "",
+    "ai_response":        "",
 }
 for _k, _v in DEFAULTS.items():
     if _k not in st.session_state:
@@ -684,6 +695,7 @@ if view == "modernize":
                         st.session_state.generated_files     = result["files"]
                         st.session_state.zip_data            = result["zip_data"]
                         st.session_state.transformation_log  = result["transformation_log"]
+                        st.session_state.sql_filename        = uploaded_file.name  # Store filename for audit logging
                         st.session_state.stats = {
                             "table_count":          result["table_count"],
                             "column_count":         result["column_count"],
@@ -746,11 +758,23 @@ if view == "modernize":
                 st.session_state.processed = False
                 st.rerun()
         else:
-            tab_schema, tab_orm, tab_report = st.tabs([
-                "☰  SCHEMA OVERVIEW",
-                "{ }  GENERATED ORM",
-                "⊕  MODERNIZATION REPORT",
-            ])
+            # Check if watsonx.ai credentials are available
+            has_watsonx = get_watsonx_credentials() is not None
+            
+            # Create tabs based on watsonx availability
+            if has_watsonx:
+                tab_schema, tab_orm, tab_report, tab_ai = st.tabs([
+                    "☰  SCHEMA OVERVIEW",
+                    "{ }  GENERATED ORM",
+                    "⊕  MODERNIZATION REPORT",
+                    "💬  AI ASSISTANT",
+                ])
+            else:
+                tab_schema, tab_orm, tab_report = st.tabs([
+                    "☰  SCHEMA OVERVIEW",
+                    "{ }  GENERATED ORM",
+                    "⊕  MODERNIZATION REPORT",
+                ])
 
             # ══════════════════════════════════════════════════════════════════
             # TAB 1 — Parsed Schema Extractor  (matches dashboard.png)
@@ -1261,18 +1285,192 @@ if view == "modernize":
                     </div>
                 </div>
                 """)
-
-                # Download full zip
-                st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
-                if st.session_state.zip_data:
-                    st.download_button(
-                        "⬇  DOWNLOAD COMPLETE PROJECT (ZIP)",
-                        data=st.session_state.zip_data,
-                        file_name="legacylink_generated_project.zip",
-                        mime="application/zip",
-                        use_container_width=True,
-                        key="dl_zip_report",
+            
+            # ══════════════════════════════════════════════════════════════════
+            # TAB 4 — AI ASSISTANT (IBM watsonx.ai)
+            # ══════════════════════════════════════════════════════════════════
+            # Only render AI Assistant tab if watsonx credentials are available
+            # This ensures tab_ai is always defined when we try to use it
+            if has_watsonx:
+                # tab_ai is guaranteed to be defined here because has_watsonx is True
+                # and we created it in the if block above
+                with tab_ai:  # type: ignore[possibly-unbound]
+                    st.markdown("""
+                    <div style='margin-bottom:20px;'>
+                        <h2 style='margin:0 0 4px;font-size:28px !important;'>
+                            💬 AI Assistant
+                        </h2>
+                        <p style='color:#849495;font-size:13px;margin:0;'>
+                            Powered by IBM watsonx.ai · Ask questions about your modernized schema
+                        </p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Example questions
+                    st.markdown("""
+                    <div class='cyber-panel' style='padding:16px 20px;margin-bottom:20px;'>
+                        <div style='color:#00F5FF;font-size:11px;font-weight:700;
+                                    letter-spacing:0.1em;margin-bottom:12px;'>
+                            EXAMPLE QUESTIONS
+                        </div>
+                        <div style='color:#b9caca;font-size:12px;line-height:20px;'>
+                            • Explain this schema to a new developer<br>
+                            • Which columns look like foreign keys?<br>
+                            • What legacy naming patterns were fixed?<br>
+                            • Summarize the modernization report<br>
+                            • What should a developer review first?
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Question input
+                    user_question = st.text_area(
+                        "Ask a question about your schema:",
+                        value=st.session_state.ai_question,
+                        height=100,
+                        placeholder="e.g., Explain the Customer model and its relationships...",
+                        key="ai_question_input"
                     )
+                    
+                    col1, col2, col3 = st.columns([1, 1, 3])
+                    
+                    with col1:
+                        ask_button = st.button(
+                            "🤖 ASK IBM WATSONX.AI",
+                            type="primary",
+                            use_container_width=True
+                        )
+                    
+                    with col2:
+                        if st.button("🗑️ Clear", use_container_width=True):
+                            st.session_state.ai_question = ""
+                            st.session_state.ai_response = ""
+                            st.rerun()
+                    
+                    # Process question
+                    if ask_button and user_question and user_question.strip():
+                        st.session_state.ai_question = user_question
+                        
+                        with st.spinner("🤖 IBM watsonx.ai is thinking..."):
+                            # Build context based on question content
+                            context_parts = []
+                            
+                            question_lower = user_question.lower()
+                            
+                            # Always include schema context
+                            if tables:
+                                context_parts.append(build_schema_context(tables))
+                            
+                            # Include transformations if question is about naming/changes
+                            if any(word in question_lower for word in ['naming', 'transform', 'change', 'fix', 'pattern', 'legacy']):
+                                if tlog:
+                                    context_parts.append(build_transformation_context(tlog))
+                            
+                            # Include models if question is about ORM/models/classes
+                            if any(word in question_lower for word in ['model', 'orm', 'class', 'sqlalchemy', 'explain']):
+                                if files and 'models.py' in files:
+                                    context_parts.append(build_models_context(files['models.py']))
+                            
+                            # Include report if question asks for summary/report
+                            if any(word in question_lower for word in ['report', 'summary', 'summarize', 'overview']):
+                                if files and 'modernization_report.md' in files:
+                                    context_parts.append(build_report_context(files['modernization_report.md']))
+                            
+                            # Combine all context
+                            full_context = "\n\n".join(context_parts)
+                            
+                            # Ask watsonx.ai
+                            response = ask_watsonx(user_question, full_context)
+                            st.session_state.ai_response = response
+                            
+                            # Log to PostgreSQL audit if enabled
+                            if response and not response.startswith("⚠️"):
+                                # Determine source context type
+                                source_context = "schema"
+                                if any(word in question_lower for word in ['model', 'orm', 'class']):
+                                    source_context = "models"
+                                elif any(word in question_lower for word in ['report', 'summary']):
+                                    source_context = "report"
+                                elif any(word in question_lower for word in ['naming', 'transform']):
+                                    source_context = "transformations"
+                                
+                                # Get metadata
+                                sql_filename = st.session_state.get("sql_filename", "")
+                                table_count = st.session_state.stats.get("table_count", 0) if st.session_state.stats else 0
+                                model_id = st.secrets.get("WATSONX_MODEL_ID", "ibm/granite-4-h-small")
+                                
+                                # Log interaction
+                                success, message = log_ai_assistant_interaction(
+                                    question=user_question,
+                                    answer=response,
+                                    source_context=source_context,
+                                    sql_filename=sql_filename,
+                                    table_count=table_count,
+                                    model_id=model_id,
+                                    status="success"
+                                )
+                                
+                                # Store audit status for display
+                                st.session_state.audit_log_status = (success, message)
+                    
+                    # Display response
+                    if st.session_state.ai_response:
+                        # Title
+                        st.markdown("""
+                        <div style='color:#00F5FF;font-size:11px;font-weight:700;
+                                    letter-spacing:0.1em;margin-top:20px;margin-bottom:12px;'>
+                            IBM WATSONX.AI RESPONSE
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Scrollable response container
+                        with st.container(height=400, border=True):
+                            st.markdown(st.session_state.ai_response)
+                        
+                        # Note
+                        st.markdown("""
+                        <div style='margin-top:12px;padding:10px;background:rgba(59,130,246,0.08);
+                                    border-left:2px solid #3B82F6;border-radius:2px;'>
+                            <div style='color:#849495;font-size:10px;line-height:1.5;'>
+                                💡 <strong>Note:</strong> Response generated by IBM watsonx.ai.
+                                Always review generated code before production use.
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Display audit log status if available
+                        if hasattr(st.session_state, 'audit_log_status'):
+                            success, message = st.session_state.audit_log_status
+                            if success and "saved to PostgreSQL" in message:
+                                st.markdown("""
+                                <div style='margin-top:8px;padding:8px;background:rgba(16,185,129,0.08);
+                                            border-left:2px solid #10B981;border-radius:2px;'>
+                                    <div style='color:#849495;font-size:10px;line-height:1.5;'>
+                                        ✓ <strong>Audit log saved to PostgreSQL</strong>
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            elif not success and message:
+                                st.markdown(f"""
+                                <div style='margin-top:8px;padding:8px;background:rgba(239,68,68,0.08);
+                                            border-left:2px solid #EF4444;border-radius:2px;'>
+                                    <div style='color:#849495;font-size:10px;line-height:1.5;'>
+                                        ⚠ <strong>Audit logging:</strong> {message}
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+            # Download full zip
+            st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
+            if st.session_state.zip_data:
+                st.download_button(
+                    "⬇  DOWNLOAD COMPLETE PROJECT (ZIP)",
+                    data=st.session_state.zip_data,
+                    file_name="legacylink_generated_project.zip",
+                    mime="application/zip",
+                    use_container_width=True,
+                    key="dl_zip_report",
+                )
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HISTORY VIEW

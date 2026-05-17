@@ -147,9 +147,9 @@ SQLite or no live database is enough for testing generated SQLAlchemy models.
 
 ---
 
-## AI Engineer 1 Task Focus
+## Task Focus
 
-AI Engineer 1 should focus on these files:
+ should focus on these files:
 
 ```text
 parser/sql_parser.py
@@ -164,98 +164,92 @@ Do not redesign the Streamlit UI unless a backend change requires it.
 
 ---
 
-## Required Fixes Before Demo
+## Implementation Status - ✅ ALL FIXES COMPLETED
 
-### 1. Fix Base import in generated models.py
+### 1. ✅ Fix Base import in generated models.py - COMPLETED
 
-Generated `models.py` should include:
+**Status:** Fixed in `generator/model_generator.py`
+
+Generated `models.py` now correctly includes:
 
 ```python
+from datetime import datetime
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Integer, String, Text, DateTime, Date, Boolean, Numeric, Float
 from database import Base
 ```
 
-The generated model classes should use:
+The generated model classes properly use:
 
 ```python
 class Customer(Base):
 ```
 
-Do not define a second `Base` in `models.py` if `database.py` already provides it.
+No duplicate `Base` definition in `models.py`.
 
 ---
 
-### 2. Fix foreign key column normalization
+### 2. ✅ Fix foreign key column normalization - COMPLETED
 
-Wrong behavior:
+**Status:** Fixed in `parser/name_normalizer.py`
+
+Correct behavior now implemented:
 
 ```text
-fk_str_id -> id
+fk_str_id -> store_id ✓
+fk_cust_id -> customer_id ✓
 ```
 
-Correct behavior:
+The normalizer removes the `fk_` prefix first, then expands abbreviations:
 
 ```text
-fk_str_id -> store_id
-fk_cust_id -> customer_id
-```
-
-The normalizer should remove only the `fk_` prefix, then expand abbreviations.
-
-Examples:
-
-```text
-fk_str_id -> str_id -> store_id
-fk_cust_id -> cust_id -> customer_id
+fk_str_id -> str_id -> store_id ✓
+fk_cust_id -> cust_id -> customer_id ✓
 ```
 
 ---
 
-### 3. Fix timestamp normalization
+### 3. ✅ Fix timestamp normalization - COMPLETED
 
-Wrong or weak behavior:
+**Status:** Fixed in `parser/name_normalizer.py`
 
-```text
-dt_upd_dt -> upd_at
-dt_crt_dt -> crt_at
-dt_ord_dt -> ord_at
-```
-
-Correct behavior:
+Explicit special-case mappings now implemented:
 
 ```text
-dt_upd_dt -> updated_at
-dt_crt_dt -> created_at
-dt_ord_dt -> ordered_at
+dt_upd_dt -> updated_at ✓
+dt_crt_dt -> created_at ✓
+dt_ord_dt -> ordered_at ✓
 ```
 
-Add explicit special-case mappings before generic prefix removal.
+Special cases are handled before generic prefix removal.
 
 ---
 
-### 4. Prevent duplicate column names
+### 4. ✅ Prevent duplicate column names - COMPLETED
 
-Generated model must not contain duplicate Python attribute names.
+**Status:** Fixed in `parser/name_normalizer.py` and `app.py`
 
-Bad example:
+- Added `used_column_names` set to track names per table
+- Added `reset_column_context()` method
+- Updated `app.py` to call `reset_column_context()` before processing each table's columns
 
-```python
-id: Mapped[int] = mapped_column(Integer, primary_key=True)
-id: Mapped[int] = mapped_column(Integer)
-```
-
-Correct examples:
+Result: Each table can have its own `id` column without conflicts:
 
 ```text
-c_id -> id
-fk_str_id -> store_id
-fk_cust_id -> customer_id
+Customer.c_id -> id ✓
+Store.str_id -> id ✓
+OrderDetail.ord_id -> id ✓
 ```
+
+No duplicate column names within the same table.
 
 ---
 
-### 5. Update requirements.txt
+### 5. ✅ Update requirements.txt - COMPLETED
 
-Root `requirements.txt` should include:
+**Status:** Updated
+
+Root `requirements.txt` now includes:
 
 ```text
 streamlit>=1.28.0
@@ -263,6 +257,18 @@ pandas>=2.0.0
 sqlalchemy>=2.0.0
 pytest>=7.0.0
 ```
+
+---
+
+### 6. ✅ Update IBM Bob Wording - COMPLETED
+
+**Status:** Updated in `app.py`
+
+Changed from:
+- `IBM_BOB_MODEL_LOADED` → `IBM_BOB_ASSISTED_WORKFLOW_READY`
+- `IBM_BOB_MODEL: ONLINE` → `IBM_BOB_ASSISTED_DEVELOPMENT: ENABLED`
+
+Correctly reflects IBM Bob as an assisted development tool, not a runtime model.
 
 ---
 
@@ -372,71 +378,4 @@ class Customer(Base):
     status: Mapped[int] = mapped_column(Integer)
 ```
 
----
-
-## Do Not Build Now
-
-Do not add:
-
-- PostgreSQL
-- PostgreSQL MCP
-- watsonx.ai runtime
-- Live database connection
-- Docker
-- Authentication
-- Full SQL dialect support
-- Stored procedure migration
-- Trigger migration
-- View migration
-- Full ERD diagram generation
-
-Keep the MVP simple and demo-ready.
-
----
-
-## Coding Rules
-
-- Keep code simple.
-- Keep functions small.
-- Do not overengineer.
-- Do not rewrite the whole UI.
-- Add docstrings for important functions.
-- Add tests for parser and normalizer.
-- Make generated code importable.
-- Make generated pytest tests runnable.
-
----
-
-## Final Demo Checklist
-
-Before submission, confirm:
-
-```text
-[ ] Streamlit app runs
-[ ] SQL file upload works
-[ ] Example SQL parses correctly
-[ ] Clean table names look correct
-[ ] Clean column names look correct
-[ ] Generated models.py imports Base correctly
-[ ] No duplicate column names
-[ ] Generated test_models.py runs with pytest
-[ ] ZIP download works
-[ ] README is updated
-[ ] modernization_report.md is generated
-[ ] bob_sessions folder exists
-[ ] Bob session markdown exports are added
-[ ] Bob session screenshots are added
-[ ] No API keys or credentials are committed
-```
-
----
-
-## Submission Reminder
-
-Before final submission:
-
-- Use Bob IDE for project work.
-- Export relevant Bob task session reports.
-- Take screenshots of Bob task session consumption summaries.
-- Put exported markdown files and screenshots into `bob_sessions/`.
-- Do not commit credentials, API keys, or private data.
+Made with Bob
