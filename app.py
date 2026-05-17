@@ -653,7 +653,7 @@ with st.sidebar:
     if icon_b64:
         logo_html = (
             f"<img src='data:image/png;base64,{icon_b64}' "
-            "style='width:32px;height:32px;object-fit:contain;"
+            "style='width:100px;height:100px;object-fit:contain;"
             "border:1px solid #00F5FF;background:#1E293B;padding:3px;'/>"
         )
     else:
