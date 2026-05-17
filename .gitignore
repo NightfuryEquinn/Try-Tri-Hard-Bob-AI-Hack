@@ -6,6 +6,7 @@ __pycache__/
 .Python
 logs/
 .bob/
+.pytest_cache/
 
 # Virtual environments
 .env
@@ -30,7 +31,28 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
+# Credentials and secrets
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+config/credentials.json
+ibm-credentials.env
+
 # Streamlit
 .streamlit/secrets.toml
+
+# Generated outputs
+generated_project/
+legacylink_project*/
+*.zip
+
+# Local logs
+logs/
+*.log
+
+# Bob
+.bob/
 
 # Made with Bob
