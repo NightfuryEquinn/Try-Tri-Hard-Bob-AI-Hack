@@ -17,8 +17,8 @@ class NameNormalizer:
             'tbl_': '',
             'tb_': '',
             't_': '',
-            
-            # Common abbreviations
+
+            # Common abbreviations (used for table name expansion)
             'CUST': 'Customer',
             'MSTR': 'Master',
             'STR': 'Store',
@@ -34,12 +34,40 @@ class NameNormalizer:
             'DEPT': 'Department',
             'EMP': 'Employee',
             'MGR': 'Manager',
-            
-            # Column prefixes (removed from here, handled separately)
-            
+            'HDR': 'Header',
+            'LN': 'Line',
+            'ITM': 'Item',
+            'WH': 'Warehouse',
+            'INV': 'Invoice',
+            'PMT': 'Payment',
+            'TXN': 'Transaction',
+            'LVL': 'Level',
+            'LOC': 'Location',
+            'TERR': 'Territory',
+            'CFG': 'Config',
+            'SYS': 'System',
+            'USR': 'User',
+            'LKP': 'Lookup',
+            'REF': 'Reference',
+            'HIST': 'History',
+            'PRD': 'Product',
+            'SALES': 'Sales',
+            'HR': 'Hr',
+            'FINAL': '',
+            'STATUS': 'Status',
+            'PRICE': 'Price',
+            'STOCK': 'Stock',
+            'ACTIVITY': 'Activity',
+            'LOG': 'Log',
+            'PARAMS': 'Params',
+            'COUNTRY': 'Country',
+            'CD': 'Code',
+
             # Common column abbreviations
             'fname': 'first_name',
             'lname': 'last_name',
+            'f': 'first',
+            'l': 'last',
             'addr': 'address',
             'amt': 'amount',
             'qty': 'quantity',
@@ -51,40 +79,72 @@ class NameNormalizer:
             'ord': 'order',
             'prod': 'product',
             'str': 'store',
+            'prd': 'product',
+            'cat': 'category',
+            'subcat': 'subcategory',
+            'mgr': 'manager',
+            'emp': 'employee',
+            'dept': 'department',
+            'terr': 'territory',
+            'inv': 'invoice',
+            'pmt': 'payment',
+            'txn': 'transaction',
+            'wh': 'warehouse',
+            'lvl': 'level',
+            'cfg': 'config',
+            'usr': 'user',
+            'nm': 'name',
+            'cd': 'code',
+            'ref': 'reference',
+            'lmt': 'limit',
+            'pct': 'percent',
+            'eff': 'effective',
+            'ln': 'line',
+            'ph': 'phone',
+            'mid': 'middle',
+            'init': 'initial',
+            'uom': 'unit_of_measure',
         }
-        
+
         self.transformation_log = []
         self.used_column_names = set()
     
     def normalize_table_name(self, table_name: str) -> str:
         """
         Convert legacy table name to clean Python class name
-        
+
         Args:
             table_name: Original table name (e.g., 'tbl_CUST_MSTR_2012_v2')
-            
+                        May include schema prefix (e.g., 'raw_layer.z_customer_master_legacy')
+
         Returns:
             Clean class name (e.g., 'Customer')
         """
         original = table_name
         cleaned = table_name
-        
-        # Remove common prefixes
+
+        # Strip schema prefix if present (e.g., raw_layer.table_name -> table_name)
+        if '.' in cleaned:
+            cleaned = cleaned.split('.')[-1]
+            self._log_transformation(original, f"Stripped schema prefix, using: {cleaned}")
+
+        # Remove common table prefixes (case-insensitive)
         for prefix in ['tbl_', 'tb_', 't_']:
             if cleaned.lower().startswith(prefix):
                 cleaned = cleaned[len(prefix):]
                 self._log_transformation(original, f"Removed prefix: {prefix}")
-        
-        # Remove version suffixes (e.g., _2012_v2, _v1, _2015)
+
+        # Remove version suffixes (e.g., _2012_v2, _v1, _2015, _FINAL_v3)
+        cleaned = re.sub(r'_FINAL', '', cleaned, flags=re.IGNORECASE)
         cleaned = re.sub(r'_\d{4}(_v\d+)?$', '', cleaned)
         cleaned = re.sub(r'_v\d+$', '', cleaned)
         if cleaned != table_name:
             self._log_transformation(original, "Removed version suffix")
-        
+
         # Split by underscore and expand abbreviations
         parts = cleaned.split('_')
         expanded_parts = []
-        
+
         for part in parts:
             part_upper = part.upper()
             if part_upper in self.abbreviations:
@@ -95,17 +155,17 @@ class NameNormalizer:
             else:
                 # Capitalize first letter
                 expanded_parts.append(part.capitalize())
-        
+
         # Join parts and remove 'Master' if it's redundant
         result = ''.join(expanded_parts)
         if result.endswith('Master'):
             result = result[:-6]  # Remove 'Master'
             self._log_transformation(original, "Removed redundant 'Master'")
-        
+
         # Ensure result is not empty
         if not result:
             result = table_name.capitalize()
-        
+
         self._log_transformation(original, f"Final table name: {result}")
         return result
     
@@ -139,7 +199,7 @@ class NameNormalizer:
         
         # Step 2: Remove type prefixes but keep the semantic part
         prefix_removed = None
-        for prefix in ['vch_', 'int_', 'dec_', 'dt_']:
+        for prefix in ['vch_', 'int_', 'dec_', 'dt_', 'bit_', 'txt_']:
             if cleaned.startswith(prefix):
                 cleaned = cleaned[len(prefix):]
                 prefix_removed = prefix

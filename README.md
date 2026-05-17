@@ -151,18 +151,56 @@ For the full table schema, example SQL queries, and troubleshooting details, see
 
 ```text
 legacylink-ai/
-├── app.py
-├── requirements.txt
-├── examples/
-│   └── legacy_customer_schema.sql
-├── parser/
-├── generator/
-├── services/
+├── app.py                          # Main Streamlit dashboard
+├── requirements.txt                # Python dependencies
+├── LICENSE                         # MIT License
+├── .env.example                    # Environment variables template
+├── .gitignore                      # Git ignore rules
+├── .streamlit/                     # Streamlit configuration
+├── assets/                         # UI assets and screenshots
+│   ├── dashboard.png
+│   ├── icon.png
+│   ├── orm.png
+│   ├── preview.png
+│   └── report.png
+├── config/                         # Configuration modules
+│   └── __init__.py
+├── storage/                        # Storage modules
+│   └── __init__.py
+├── parser/                         # SQL parsing modules
+│   ├── __init__.py
+│   ├── sql_parser.py
+│   └── name_normalizer.py
+├── generator/                      # Code generation modules
+│   ├── __init__.py
+│   ├── model_generator.py
+│   ├── test_generator.py
+│   ├── report_generator.py
+│   ├── function_generator.py
+│   ├── index_generator.py
+│   └── zip_packager.py
+├── services/                       # AI and audit services
+│   ├── __init__.py
 │   ├── watsonx_client.py
 │   └── audit_logger.py
-├── templates/
-├── tests/
-└── docs/
+├── templates/                      # Code templates
+├── examples/                       # Example SQL files
+│   ├── legacy_customer_schema.sql
+│   ├── legacy_enterprise_schema.sql
+│   ├── extremely_confusing_legacy_sql_report.sql
+│   ├── withindexing.sql
+│   └── withmodellingconcept.sql
+├── tests/                          # Test files
+│   ├── test_normalization.py
+│   ├── test_tab_logic.py
+│   └── test_watsonx_integration.py
+└── docs/                           # Documentation
+    ├── AGENTS.md
+    ├── DATASET.md
+    ├── DESIGN.md
+    ├── ENHANCEMENT_SUMMARY.md
+    ├── IMPLEMENTATION_PLAN.md
+    ├── PROJECT.md
     └── POSTGRES_AUDIT_LOGGING.md
 ```
 

@@ -13,7 +13,12 @@ class ModelGenerator:
         self.type_mapping = {
             'INT': 'Integer',
             'INTEGER': 'Integer',
+            'BIGINT': 'BigInteger',
+            'SMALLINT': 'SmallInteger',
+            'SERIAL': 'Integer',
+            'BIGSERIAL': 'BigInteger',
             'VARCHAR': 'String',
+            'CHAR': 'String',
             'TEXT': 'Text',
             'TIMESTAMP': 'DateTime',
             'DATETIME': 'DateTime',
@@ -23,7 +28,11 @@ class ModelGenerator:
             'DECIMAL': 'Numeric',
             'NUMERIC': 'Numeric',
             'FLOAT': 'Float',
-            'DOUBLE': 'Float'
+            'DOUBLE': 'Float',
+            'REAL': 'Float',
+            'UUID': 'UUID',
+            'JSONB': 'JSON',
+            'JSON': 'JSON'
         }
     
     def generate_models(self, tables: List[Dict]) -> str:
@@ -47,21 +56,49 @@ class ModelGenerator:
     
     def _generate_imports(self, tables: List[Dict]) -> str:
         """Generate import statements based on used types"""
+        # Collect all used SQLAlchemy types
+        sa_types_used = set()
+        for table in tables:
+            for col in table.get('columns', []):
+                sa_type = self.type_mapping.get(col['type'], 'String')
+                # Strip size params for import
+                base_type = sa_type.split('(')[0]
+                sa_types_used.add(base_type)
+
+        # Always include common types
+        sa_types_used.update(['Integer', 'String'])
+
+        # Separate standard types from special imports
+        standard_types = sorted(sa_types_used - {'UUID', 'JSON', 'BigInteger', 'SmallInteger'})
+        special_imports = []
+
+        if 'BigInteger' in sa_types_used:
+            standard_types.append('BigInteger')
+        if 'SmallInteger' in sa_types_used:
+            standard_types.append('SmallInteger')
+        if 'UUID' in sa_types_used:
+            special_imports.append("from sqlalchemy.dialects.postgresql import UUID as PG_UUID")
+        if 'JSON' in sa_types_used:
+            standard_types.append('JSON')
+
         imports = [
             "from sqlalchemy.orm import Mapped, mapped_column",
-            "from sqlalchemy import Integer, String, Text, DateTime, Date, Boolean, Numeric, Float",
+            f"from sqlalchemy import {', '.join(sorted(standard_types))}",
             "from database import Base"
         ]
-        
+
+        if special_imports:
+            imports[1:1] = special_imports
+
         # Check if datetime is needed
         has_datetime = any(
-            any(col['type'] in ['TIMESTAMP', 'DATETIME'] for col in table['columns'])
+            any(col['type'] in ['TIMESTAMP', 'DATETIME'] for col in table.get('columns', []))
             for table in tables
         )
-        
+
         if has_datetime:
             imports.insert(0, "from datetime import datetime")
-        
+
         return '\n'.join(imports)
     
     def _generate_model_class(self, table: Dict) -> str:
@@ -122,14 +159,18 @@ class ModelGenerator:
         # Determine Python type hint
         if sa_type.startswith('String') or sa_type == 'Text':
             py_type = 'str'
-        elif sa_type == 'Integer':
+        elif sa_type in ('Integer', 'BigInteger', 'SmallInteger'):
             py_type = 'int'
-        elif sa_type == 'Float' or sa_type == 'Numeric':
+        elif sa_type in ('Float', 'Numeric'):
             py_type = 'float'
         elif sa_type == 'Boolean':
             py_type = 'bool'
-        elif sa_type == 'DateTime' or sa_type == 'Date':
+        elif sa_type in ('DateTime', 'Date'):
             py_type = 'datetime'
+        elif sa_type == 'UUID':
+            py_type = 'str'
+        elif sa_type == 'JSON':
+            py_type = 'dict'
         else:
             py_type = 'str'
         

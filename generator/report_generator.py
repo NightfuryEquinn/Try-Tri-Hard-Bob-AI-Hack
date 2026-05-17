@@ -3,7 +3,7 @@ Report Generator for LegacyLink AI
 Generates README and modernization reports
 """
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 from datetime import datetime
 
 
@@ -118,20 +118,29 @@ For more information, see `modernization_report.md`.
 """
         return readme
     
-    def generate_modernization_report(self, tables: List[Dict], transformation_log: List[Dict]) -> str:
+    def generate_modernization_report(self, tables: List[Dict], transformation_log: List[Dict],
+                                     functions: Optional[List[Dict]] = None, indexes: Optional[List[Dict]] = None,
+                                     views: Optional[List[Dict]] = None) -> str:
         """
         Generate detailed modernization report
-        
+
         Args:
             tables: List of table dictionaries
             transformation_log: List of transformation records
-            
+            functions: List of function/procedure dictionaries (optional)
+            indexes: List of index dictionaries (optional)
+            views: List of view dictionaries (optional)
+
         Returns:
             Complete modernization_report.md content
         """
+        functions = functions or []
+        indexes = indexes or []
+        views = views or []
+
         report = f"""# Modernization Report
 
-**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 **Tool:** LegacyLink AI (IBM Bob-assisted)
 
 ## Executive Summary
@@ -141,11 +150,20 @@ This report documents the transformation of legacy SQL schema into modern SQLAlc
 **Statistics:**
 - **Tables Processed:** {len(tables)}
 - **Total Columns:** {sum(len(table['columns']) for table in tables)}
+- **Functions/Procedures Found:** {len(functions)}
+- **Indexes Found:** {len(indexes)}
+- **Views Found:** {len(views)}
 - **Transformations Applied:** {len(transformation_log)}
 
 ## Table Transformations
 
 {self._generate_table_transformations(tables)}
+
+{self._generate_functions_section(functions)}
+
+{self._generate_indexes_section(indexes)}
+
+{self._generate_views_section(views)}
 
 ## Detailed Transformation Log
 
@@ -158,13 +176,17 @@ The following SQL types were mapped to SQLAlchemy types:
 | SQL Type | SQLAlchemy Type | Python Type |
 |----------|----------------|-------------|
 | INT, INTEGER | Integer | int |
-| VARCHAR(n) | String(n) | str |
+| BIGINT, BIGSERIAL | BigInteger | int |
+| SMALLINT | SmallInteger | int |
+| VARCHAR(n), CHAR(n) | String(n) | str |
 | TEXT | Text | str |
 | TIMESTAMP, DATETIME | DateTime | datetime |
 | DATE | Date | datetime |
-| BOOLEAN, BOOL | Boolean | bool |
+| BOOLEAN, BOOL, BIT | Boolean | bool |
 | DECIMAL, NUMERIC | Numeric | float |
-| FLOAT, DOUBLE | Float | float |
+| FLOAT, DOUBLE, REAL | Float | float |
+| UUID | UUID | str |
+| JSON, JSONB | JSON | dict |
 
 ## Naming Conventions Applied
 
@@ -337,5 +359,105 @@ Key columns:
                 sections.append("")
         
         return '\n'.join(sections)
+    
+    def _generate_functions_section(self, functions: List[Dict]) -> str:
+        """Generate section documenting legacy functions and procedures"""
+        if not functions:
+            return ""
+        
+        section = f"""## Legacy Functions and Procedures
+
+**Found {len(functions)} function(s)/procedure(s) in the legacy schema.**
+
+These legacy database functions should be reviewed and potentially refactored into application-level code:
+
+"""
+        for func in functions:
+            returns_info = ""
+            if func.get('returns'):
+                returns_preview = func['returns'][:100] + "..." if len(func['returns']) > 100 else func['returns']
+                returns_info = f"\n**Returns:** `{returns_preview}`"
+            
+            section += f"""### {func['name']}
+
+**Type:** {func['type'].title()}  
+**Language:** {func['language']}{returns_info}
+
+**Modernization Recommendation:**
+- Consider refactoring this logic into Python application code
+- Use SQLAlchemy queries instead of database-side logic where possible
+- If complex business logic, consider creating a service layer
+- For reporting functions, consider using pandas or similar tools
+
+---
+
+"""
+        
+        return section
+    
+    def _generate_indexes_section(self, indexes: List[Dict]) -> str:
+        """Generate section documenting legacy indexes"""
+        if not indexes:
+            return ""
+        
+        section = f"""## Legacy Indexes
+
+**Found {len(indexes)} index(es) in the legacy schema.**
+
+These indexes should be recreated in your SQLAlchemy models for optimal performance:
+
+"""
+        for idx in indexes:
+            unique_str = "UNIQUE " if idx['unique'] else ""
+            section += f"""### {idx['name']}
+
+**Type:** {unique_str}Index  
+**Table:** `{idx['table']}`  
+**Columns:** `{idx['columns']}`
+
+**Implementation in SQLAlchemy:**
+```python
+# Add to your {idx['table']} model:
+__table_args__ = (
+    Index('{idx['name']}', '{idx['columns'].replace(',', "', '")}'{', unique=True' if idx['unique'] else ''}),
+)
+```
+
+---
+
+"""
+        
+        return section
+
+    def _generate_views_section(self, views: List[Dict]) -> str:
+        """Generate section documenting legacy views"""
+        if not views:
+            return ""
+
+        materialized = [v for v in views if v.get('materialized')]
+        regular = [v for v in views if not v.get('materialized')]
+
+        section = f"""## Legacy Views
+
+**Found {len(views)} view(s) in the legacy schema** ({len(materialized)} materialized, {len(regular)} regular).
+
+"""
+        if materialized:
+            section += "### Materialized Views\n\n"
+            for v in materialized:
+                section += f"- `{v['name']}`\n"
+            section += "\n"
+
+        if regular:
+            section += "### Regular Views\n\n"
+            for v in regular:
+                section += f"- `{v['name']}`\n"
+            section += "\n"
+
+        section += """**Note:** Views are not directly converted to ORM models.
+They represent query logic that should be implemented as Python query functions or SQLAlchemy hybrid properties.
+
+"""
+        return section
 
 # Made with Bob
