@@ -12,6 +12,8 @@ from generator.model_generator import ModelGenerator
 from generator.test_generator import TestGenerator
 from generator.report_generator import ReportGenerator
 from generator.zip_packager import ZipPackager
+from generator.function_generator import FunctionGenerator
+from generator.index_generator import IndexGenerator
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,6 +63,13 @@ def process_sql_file(sql_content: str) -> dict | None:
         )
         requirements = report_gen.generate_requirements()
 
+        # Generate functions.py and indexes.py
+        function_gen = FunctionGenerator()
+        functions_code = function_gen.generate_functions_file(functions)
+        
+        index_gen = IndexGenerator()
+        indexes_code = index_gen.generate_indexes_file(indexes)
+
         files = {
             "models.py":               models_code,
             "database.py":             database_code,
@@ -68,6 +77,8 @@ def process_sql_file(sql_content: str) -> dict | None:
             "README.md":               readme,
             "modernization_report.md": modernization_report,
             "requirements.txt":        requirements,
+            "functions.py":            functions_code,
+            "indexes.py":              indexes_code,
         }
 
         zip_data = ZipPackager().create_zip(files)
@@ -475,6 +486,48 @@ hr { border-color: #2e3637 !important; }
     border-left: 3px solid #00F5FF;
 }
 
+/* ── Clickable table rows ── */
+.table-row-clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.table-row-clickable:hover td {
+    background: rgba(0,245,255,0.08) !important;
+}
+.table-row-clickable.row-active td {
+    background: rgba(0,245,255,0.12) !important;
+    border-left: 3px solid #00F5FF !important;
+}
+
+/* ── Table row buttons (make buttons look like table cells) ── */
+.schema-table td .stButton {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+.schema-table td .stButton > button {
+    width: 100% !important;
+    padding: 10px 8px !important;
+    margin: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    color: #dce4e4 !important;
+    text-align: left !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    text-transform: none !important;
+    letter-spacing: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+.schema-table td .stButton > button:hover {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+.schema-table .row-active td .stButton > button {
+    color: #00F5FF !important;
+    font-weight: 600 !important;
+}
+
 /* ── Transformation log table ── */
 .tlog-table {
     width: 100%;
@@ -692,6 +745,8 @@ if view == "modernize":
                         st.session_state.generated_files     = result["files"]
                         st.session_state.zip_data            = result["zip_data"]
                         st.session_state.transformation_log  = result["transformation_log"]
+                        st.session_state.original_sql        = sql_content
+                        st.session_state.selected_table_idx  = 0  # Default to first table
                         st.session_state.stats = {
                             "table_count":          result["table_count"],
                             "column_count":         result["column_count"],
@@ -790,71 +845,181 @@ if view == "modernize":
                 left_panel, right_panel = st.columns([1.3, 1], gap="medium")
 
                 with left_panel:
-                    # Build table rows HTML
-                    rows_html = ""
-                    for i, t in enumerate(tables[:12]):
+                    selected_idx = st.session_state.get("selected_table_idx", 0)
+
+                    # Panel header
+                    st.markdown("""
+                    <div style='background:#232b2c;border:1px solid #2e3637;
+                                border-bottom:none;padding:9px 16px;
+                                display:flex;align-items:center;'>
+                        <span style='color:#849495;font-size:11px;
+                                     letter-spacing:0.1em;font-weight:700;'>
+                            ☰ &nbsp;EXTRACTED_TABLES
+                        </span>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # Column header row
+                    hc1, hc2, hc3 = st.columns([3, 1, 1], gap="small")
+                    _hdr = ("background:#192121;border:1px solid #2e3637;border-top:none;"
+                            "padding:10px 10px;color:#94A3B8;font-size:10px;"
+                            "letter-spacing:0.1em;font-weight:700;")
+                    with hc1:
+                        st.markdown(f"<div style='{_hdr}border-right:none;'>TABLE_NAME</div>",
+                                    unsafe_allow_html=True)
+                    with hc2:
+                        st.markdown(f"<div style='{_hdr}border-right:none;border-left:none;"
+                                    "text-align:center;'>COLS</div>", unsafe_allow_html=True)
+                    with hc3:
+                        st.markdown(f"<div style='{_hdr}border-left:none;"
+                                    "text-align:center;'>STATUS</div>", unsafe_allow_html=True)
+
+                    # Data rows — one st.columns per table, no <table> HTML
+                    for i, t in enumerate(tables):
                         col_count = len(t["columns"])
                         has_pk    = any(c.get("primary_key") for c in t["columns"])
-                        health    = "OK"   if has_pk else "CRIT"
+                        health    = "OK" if has_pk else "CRIT"
                         h_color   = "#10B981" if has_pk else "#EF4444"
-                        row_style = (
-                            "background:rgba(0,245,255,0.04);border-left:3px solid #00F5FF;"
-                            if i == 0 else ""
-                        )
-                        name_color = "#00F5FF" if i == 0 else "#dce4e4"
-                        rows_html += f"""
-                        <tr style='{row_style}'>
-                            <td style='padding:10px 10px 10px {8 if i > 0 else 5}px;
-                                       color:{name_color};font-size:12px;
-                                       border-bottom:1px solid #192121;'>
-                                {t['original_name']}
-                            </td>
-                            <td style='padding:10px;color:#849495;text-align:right;
-                                       border-bottom:1px solid #192121;'>{col_count}</td>
-                            <td style='padding:10px;text-align:right;
-                                       border-bottom:1px solid #192121;'>
-                                <span style='color:{h_color};font-size:10px;
-                                             letter-spacing:0.1em;font-weight:700;'>
-                                    {health}
-                                </span>
+                        is_sel    = selected_idx == i
+                        row_bg    = "rgba(0,245,255,0.08)" if is_sel else "#192121"
+                        bl        = "border-left:3px solid #00F5FF;" if is_sel else ""
+
+                        rc1, rc2, rc3 = st.columns([3, 1, 1], gap="small")
+                        with rc1:
+                            if st.button(
+                                t["original_name"],
+                                key=f"table_btn_{i}",
+                                type="primary" if is_sel else "secondary",
+                                use_container_width=True,
+                            ):
+                                st.session_state.selected_table_idx = i
+                                st.rerun()
+                        with rc2:
+                            st.markdown(
+                                f"<div style='background:{row_bg};{bl}text-align:center;"
+                                f"color:#849495;font-size:12px;padding:11px 8px;"
+                                f"border-bottom:1px solid #111818;'>{col_count}</div>",
+                                unsafe_allow_html=True)
+                        with rc3:
+                            st.markdown(
+                                f"<div style='background:{row_bg};text-align:center;"
+                                f"color:{h_color};font-size:10px;font-weight:700;"
+                                f"padding:11px 8px;border-bottom:1px solid #111818;'>"
+                                f"{health}</div>",
+                                unsafe_allow_html=True)
+                    
+                    # Display extracted functions — always shown
+                    functions = st.session_state.parsed_functions
+                    st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
+                    func_rows_html = ""
+                    if functions:
+                        for func in functions:
+                            func_rows_html += f"""
+                            <tr>
+                                <td style='color:#dce4e4;font-size:12px;font-weight:600;padding:10px 8px;border-bottom:1px solid #192121;'>{func['name']}</td>
+                                <td style='color:#A855F7;font-size:11px;padding:10px 8px;border-bottom:1px solid #192121;'>{func['type'].title()}</td>
+                                <td style='color:#849495;font-size:11px;padding:10px 8px;border-bottom:1px solid #192121;'>{func['language']}</td>
+                            </tr>
+                            """
+                    else:
+                        func_rows_html = """
+                        <tr>
+                            <td colspan='3' style='text-align:center;color:#849495;
+                                                   font-size:12px;padding:20px 8px;'>
+                                No functions found
                             </td>
                         </tr>
                         """
-
                     st.html(f"""
-                    <div class='cyber-panel'>
-                        <div class='cyber-panel-header'>
+                    <div style='background:#192121;border:1px solid #2e3637;'>
+                        <div style='background:#232b2c;border-bottom:1px solid #2e3637;
+                                    padding:9px 16px;display:flex;align-items:center;
+                                    justify-content:space-between;'>
                             <span style='color:#849495;font-size:11px;
-                                         letter-spacing:0.1em;font-weight:700;'>
-                                ☰ &nbsp;EXTRACTED_TABLES
+                                         letter-spacing:0.1em;font-weight:700;
+                                         font-family:JetBrains Mono,monospace;'>
+                                ⚙ &nbsp;EXTRACTED_FUNCTIONS
                             </span>
-                            <div style='display:flex;gap:8px;'>
-                                <span style='color:#849495;font-size:14px;cursor:pointer;'>⇅</span>
-                            </div>
+                            <span style='color:#849495;font-size:10px;
+                                         font-family:JetBrains Mono,monospace;'>{len(functions)} found</span>
                         </div>
-                        <div style='padding:0 12px 8px;'>
-                            <table class='schema-table'>
-                                <thead>
-                                    <tr>
-                                        <th>TABLE_NAME</th>
-                                        <th style='text-align:right;'>COLS</th>
-                                        <th style='text-align:right;'>HEALTH_SCORE</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rows_html}
-                                </tbody>
-                            </table>
+                        <table style='width:100%;border-collapse:collapse;'>
+                            <thead>
+                                <tr>
+                                    <th style='color:#94A3B8;text-align:left;font-size:10px;letter-spacing:0.1em;font-weight:700;padding:10px 8px;border-bottom:1px solid #2e3637;font-family:JetBrains Mono,monospace;'>NAME</th>
+                                    <th style='color:#94A3B8;text-align:left;font-size:10px;letter-spacing:0.1em;font-weight:700;padding:10px 8px;border-bottom:1px solid #2e3637;font-family:JetBrains Mono,monospace;'>TYPE</th>
+                                    <th style='color:#94A3B8;text-align:left;font-size:10px;letter-spacing:0.1em;font-weight:700;padding:10px 8px;border-bottom:1px solid #2e3637;font-family:JetBrains Mono,monospace;'>LANGUAGE</th>
+                                </tr>
+                            </thead>
+                            <tbody style='font-family:JetBrains Mono,monospace;'>
+                                {func_rows_html}
+                            </tbody>
+                        </table>
+                    </div>
+                    """)
+
+                    # Display extracted indexes — always shown
+                    indexes = st.session_state.parsed_indexes
+                    st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
+                    idx_rows_html = ""
+                    if indexes:
+                        for idx in indexes:
+                            unique_badge = "<span style='color:#10B981;font-size:9px;font-family:JetBrains Mono,monospace;'>UNIQUE</span>" if idx['unique'] else ""
+                            idx_rows_html += f"""
+                            <tr>
+                                <td style='color:#dce4e4;font-size:12px;font-weight:600;padding:10px 8px;border-bottom:1px solid #192121;'>{idx['name']}</td>
+                                <td style='color:#849495;font-size:11px;padding:10px 8px;border-bottom:1px solid #192121;'>{idx['table']}</td>
+                                <td style='color:#849495;font-size:11px;padding:10px 8px;border-bottom:1px solid #192121;'>{idx['columns']}</td>
+                                <td style='padding:10px 8px;border-bottom:1px solid #192121;'>{unique_badge}</td>
+                            </tr>
+                            """
+                    else:
+                        idx_rows_html = """
+                        <tr>
+                            <td colspan='4' style='text-align:center;color:#849495;
+                                                   font-size:12px;padding:20px 8px;'>
+                                No indexes found
+                            </td>
+                        </tr>
+                        """
+                    st.html(f"""
+                    <div style='background:#192121;border:1px solid #2e3637;'>
+                        <div style='background:#232b2c;border-bottom:1px solid #2e3637;
+                                    padding:9px 16px;display:flex;align-items:center;
+                                    justify-content:space-between;'>
+                            <span style='color:#849495;font-size:11px;
+                                         letter-spacing:0.1em;font-weight:700;
+                                         font-family:JetBrains Mono,monospace;'>
+                                ⊕ &nbsp;EXTRACTED_INDEXES
+                            </span>
+                            <span style='color:#849495;font-size:10px;
+                                         font-family:JetBrains Mono,monospace;'>{len(indexes)} found</span>
                         </div>
+                        <table style='width:100%;border-collapse:collapse;'>
+                            <thead>
+                                <tr>
+                                    <th style='color:#94A3B8;text-align:left;font-size:10px;letter-spacing:0.1em;font-weight:700;padding:10px 8px;border-bottom:1px solid #2e3637;font-family:JetBrains Mono,monospace;'>INDEX_NAME</th>
+                                    <th style='color:#94A3B8;text-align:left;font-size:10px;letter-spacing:0.1em;font-weight:700;padding:10px 8px;border-bottom:1px solid #2e3637;font-family:JetBrains Mono,monospace;'>TABLE</th>
+                                    <th style='color:#94A3B8;text-align:left;font-size:10px;letter-spacing:0.1em;font-weight:700;padding:10px 8px;border-bottom:1px solid #2e3637;font-family:JetBrains Mono,monospace;'>COLUMNS</th>
+                                    <th style='color:#94A3B8;text-align:left;font-size:10px;letter-spacing:0.1em;font-weight:700;padding:10px 8px;border-bottom:1px solid #2e3637;font-family:JetBrains Mono,monospace;'>FLAGS</th>
+                                </tr>
+                            </thead>
+                            <tbody style='font-family:JetBrains Mono,monospace;'>
+                                {idx_rows_html}
+                            </tbody>
+                        </table>
                     </div>
                     """)
 
                 with right_panel:
                     if tables:
-                        t = tables[0]
+                        # Get selected table
+                        selected_idx = st.session_state.get("selected_table_idx", 0)
+                        t = tables[selected_idx] if selected_idx < len(tables) else tables[0]
+                        
                         # Column rows for inspector
                         col_rows = ""
-                        for col in t["columns"][:8]:
+                        for col in t["columns"]:
                             pk_badge = (
                                 "<span style='color:#00F5FF;font-size:10px;"
                                 "font-weight:700;margin-left:6px;'>PRI</span>"
@@ -982,15 +1147,8 @@ if view == "modernize":
 
                 left_code, right_code = st.columns(2, gap="medium")
 
-                # Reconstruct a readable legacy SQL snippet
-                legacy_snippet = ""
-                for t in tables[:3]:
-                    legacy_snippet += f"CREATE TABLE {t['original_name']} (\n"
-                    for col in t["columns"]:
-                        pk  = " PRIMARY KEY" if col.get("primary_key") else ""
-                        nn  = " NOT NULL"    if not col.get("nullable") else ""
-                        legacy_snippet += f"    {col['original_name']} {col['type']}{nn}{pk},\n"
-                    legacy_snippet = legacy_snippet.rstrip(",\n") + "\n);\n\n"
+                # Use full original SQL content
+                legacy_sql_full = st.session_state.get("original_sql", "")
 
                 with left_code:
                     st.markdown("""
@@ -998,11 +1156,11 @@ if view == "modernize":
                                 padding:9px 16px;display:flex;justify-content:space-between;
                                 align-items:center;'>
                         <span style='color:#849495;font-size:11px;letter-spacing:0.08em;
-                                     font-weight:700;'>LEGACY_SCHEMA.SQL</span>
+                                     font-weight:700;'>LEGACY_SCHEMA.SQL (FULL)</span>
                         <span class='chip chip-dep'>⚠ DEPRECATED</span>
                     </div>
                     """, unsafe_allow_html=True)
-                    st.code(legacy_snippet.strip(), language="sql")
+                    st.code(legacy_sql_full.strip() if legacy_sql_full else "No SQL content available", language="sql", line_numbers=True)
 
                 with right_code:
                     st.markdown("""
@@ -1014,14 +1172,42 @@ if view == "modernize":
                         <span class='chip chip-opt'>✓ OPTIMIZED</span>
                     </div>
                     """, unsafe_allow_html=True)
-                    st.code(files["models.py"], language="python")
+                    st.code(files["models.py"], language="python", line_numbers=True)
 
                 # database.py expander
                 with st.expander("▸  View database.py"):
-                    st.code(files["database.py"], language="python")
+                    st.code(files["database.py"], language="python", line_numbers=True)
 
                 with st.expander("▸  View test_models.py"):
-                    st.code(files["test_models.py"], language="python")
+                    st.code(files["test_models.py"], language="python", line_numbers=True)
+
+                # functions.py and indexes.py as prominent side-by-side code blocks
+                st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
+                func_col, idx_col = st.columns(2, gap="medium")
+
+                with func_col:
+                    st.markdown("""
+                    <div style='background:#1E293B;border:1px solid #2e3637;
+                                padding:9px 16px;display:flex;justify-content:space-between;
+                                align-items:center;'>
+                        <span style='color:#849495;font-size:11px;letter-spacing:0.08em;
+                                     font-weight:700;'>FUNCTIONS.PY (MODERNIZED)</span>
+                        <span class='chip chip-opt'>✓ OPTIMIZED</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.code(files.get("functions.py", "# No functions found"), language="python", line_numbers=True)
+
+                with idx_col:
+                    st.markdown("""
+                    <div style='background:#1E293B;border:1px solid #2e3637;
+                                padding:9px 16px;display:flex;justify-content:space-between;
+                                align-items:center;'>
+                        <span style='color:#849495;font-size:11px;letter-spacing:0.08em;
+                                     font-weight:700;'>INDEXES.PY (MODERNIZED)</span>
+                        <span class='chip chip-opt'>✓ OPTIMIZED</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.code(files.get("indexes.py", "# No indexes found"), language="python", line_numbers=True)
 
             # ══════════════════════════════════════════════════════════════════
             # TAB 3 — Modernization Report  (matches report.png)
@@ -1196,8 +1382,8 @@ if view == "modernize":
 
                 log_rows_html = ""
                 
-                # Show table transformations
-                for t in tables[:6]:
+                # Show ALL table transformations
+                for t in tables:
                     log_rows_html += f"""
                     <tr>
                         <td>
@@ -1224,10 +1410,9 @@ if view == "modernize":
                     </tr>
                     """
                 
-                # Show column transformations from first table
-                if tables and len(tables[0]["columns"]) > 0:
-                    first_table_cols = tables[0]["columns"][:5]  # Show first 5 columns
-                    for col in first_table_cols:
+                # Show ALL column transformations across ALL tables
+                for t in tables:
+                    for col in t["columns"]:
                         if col['original_name'] != col['clean_name']:
                             log_rows_html += f"""
                             <tr>
@@ -1241,7 +1426,7 @@ if view == "modernize":
                                     <div style='color:#F59E0B;font-size:12px;font-weight:600;
                                                 margin-bottom:2px;'>{col['original_name']}</div>
                                     <div style='color:#849495;font-size:11px;'>
-                                        Column · {tables[0]['original_name']}
+                                        Column · {t['original_name']}
                                     </div>
                                 </td>
                                 <td style='color:#849495;font-size:16px;text-align:center;'>→</td>
@@ -1254,6 +1439,65 @@ if view == "modernize":
                                 </td>
                             </tr>
                             """
+                
+                # Show ALL function transformations
+                functions = st.session_state.parsed_functions
+                for func in functions:
+                    log_rows_html += f"""
+                    <tr>
+                        <td>
+                            <div style='width:28px;height:28px;border:1px solid #A855F7;
+                                        display:flex;align-items:center;justify-content:center;'>
+                                <span style='color:#A855F7;font-size:14px;'>✓</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div style='color:#A855F7;font-size:12px;font-weight:600;
+                                        margin-bottom:2px;'>{func['name']}</div>
+                            <div style='color:#849495;font-size:11px;'>
+                                {func['type'].title()} · {func['language']}
+                            </div>
+                        </td>
+                        <td style='color:#849495;font-size:16px;text-align:center;'>→</td>
+                        <td>
+                            <div style='color:#A855F7;font-size:12px;font-weight:600;
+                                        margin-bottom:2px;'>Python Function</div>
+                            <div style='color:#849495;font-size:11px;'>
+                                Modernized in functions.py
+                            </div>
+                        </td>
+                    </tr>
+                    """
+                
+                # Show ALL index transformations
+                indexes = st.session_state.parsed_indexes
+                for idx in indexes:
+                    unique_text = "Unique " if idx['unique'] else ""
+                    log_rows_html += f"""
+                    <tr>
+                        <td>
+                            <div style='width:28px;height:28px;border:1px solid #F59E0B;
+                                        display:flex;align-items:center;justify-content:center;'>
+                                <span style='color:#F59E0B;font-size:14px;'>✓</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div style='color:#F59E0B;font-size:12px;font-weight:600;
+                                        margin-bottom:2px;'>{idx['name']}</div>
+                            <div style='color:#849495;font-size:11px;'>
+                                {unique_text}Index · Table: {idx['table']}
+                            </div>
+                        </td>
+                        <td style='color:#849495;font-size:16px;text-align:center;'>→</td>
+                        <td>
+                            <div style='color:#F59E0B;font-size:12px;font-weight:600;
+                                        margin-bottom:2px;'>SQLAlchemy Index</div>
+                            <div style='color:#849495;font-size:11px;'>
+                                Columns: {idx['columns']} | indexes.py
+                            </div>
+                        </td>
+                    </tr>
+                    """
 
                 st.html(f"""
                 <div class='cyber-panel'>
