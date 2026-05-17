@@ -17,8 +17,6 @@ from generator.report_generator import ReportGenerator
 from generator.zip_packager import ZipPackager
 from generator.function_generator import FunctionGenerator
 from generator.index_generator import IndexGenerator
-from config.cloudant_config import CloudantConfig
-from storage.cloudant_client import CloudantClient
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -128,76 +126,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-# ── Cloudant initialization ───────────────────────────────────────────────────
-
-# Initialize Cloudant client
-# ═══════════════════════════════════════════════════════════════════════════
-# IBM Cloudant NoSQL Database Integration (Optional)
-# ═══════════════════════════════════════════════════════════════════════════
-# This section initializes the optional Cloudant integration for session history.
-# If Cloudant is not configured (missing credentials in .env), the app continues
-# to work normally without history tracking.
-#
-# Configuration: See .env.example for required environment variables
-# Documentation: See docs/CLOUDANT_SETUP.md for setup instructions
-# ═══════════════════════════════════════════════════════════════════════════
-
-cloudant_config = CloudantConfig()
-cloudant_client = CloudantClient(cloudant_config) if cloudant_config.is_configured() else None
-
-def save_to_cloudant(result: dict, user_id: str):
-    """
-    Save modernization session to Cloudant NoSQL database.
-    
-    This function is called automatically after successful SQL processing.
-    It stores session metadata, processing statistics, and transformation logs
-    for history tracking and analytics.
-    
-    Args:
-        result (dict): Processing result containing tables, stats, and logs
-        user_id (str): Anonymous user identifier from session state
-    
-    Returns:
-        str: Document ID if saved successfully
-        None: If Cloudant not configured or save failed
-    
-    Note:
-        Failures are handled gracefully - the app continues to work even if
-        the save fails. Users see a warning but can still download results.
-    """
-    if not cloudant_client:
-        # Cloudant not configured - skip silently
-        return None
-    
-    try:
-        # Save session document to Cloudant
-        doc_id = cloudant_client.save_modernization_session(
-            user_id=user_id,
-            filename=result.get('filename', 'unknown.sql'),
-            file_size=result.get('file_size', 0),
-            tables=result.get('tables', []),
-            transformation_log=result.get('transformation_log', []),
-            processing_stats={
-                'table_count': result.get('table_count', 0),
-                'column_count': result.get('column_count', 0),
-                'transformation_count': result.get('transformation_count', 0),
-                'processing_time_ms': result.get('processing_time_ms', 0)
-            },
-            generated_files=result.get('files', {}),
-            original_sql=result.get('original_sql', '')
-        )
-        
-        if doc_id:
-            # Show success message to user
-            st.success(f"✅ Session saved to history (ID: {doc_id[:16]}...)")
-        
-        return doc_id
-        
-    except Exception as e:
-        # Handle errors gracefully - show warning but don't crash
-        st.warning(f"Could not save to history: {e}")
-        return None
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -765,30 +693,6 @@ with st.sidebar:
         if is_active:
             st.markdown("</div>", unsafe_allow_html=True)
     
-    # Add global statistics if Cloudant is enabled
-    if cloudant_client:
-        st.markdown("<hr class='sidebar-divider'>", unsafe_allow_html=True)
-        st.markdown("""
-        <div style='color:#849495;font-size:10px;letter-spacing:0.1em;
-                    margin-bottom:8px;'>GLOBAL STATISTICS</div>
-        """, unsafe_allow_html=True)
-        
-        stats = cloudant_client.get_statistics()
-        if stats:
-            st.markdown(f"""
-            <div style='background:#1E293B;padding:12px;border:1px solid #334155;
-                        font-size:11px;line-height:1.6;'>
-                <div style='color:#849495;'>Total Sessions:
-                    <span style='color:#00F5FF;font-weight:700;'>{stats.get('total_sessions', 0)}</span>
-                </div>
-                <div style='color:#849495;'>Tables Processed:
-                    <span style='color:#00F5FF;font-weight:700;'>{stats.get('total_tables_processed', 0)}</span>
-                </div>
-                <div style='color:#849495;'>Unique Users:
-                    <span style='color:#00F5FF;font-weight:700;'>{stats.get('unique_users', 0)}</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
 
 # ── Main content ───────────────────────────────────────────────────────────────
 
@@ -868,16 +772,6 @@ if view == "modernize":
                             "index_count":          result.get("index_count", 0),
                             "transformation_count": result["transformation_count"],
                         }
-                        
-                        # ─────────────────────────────────────────────────────
-                        # Save session to Cloudant (if configured)
-                        # ─────────────────────────────────────────────────────
-                        # This automatically saves the modernization session to
-                        # IBM Cloudant NoSQL database for history tracking.
-                        # If Cloudant is not configured, this call is skipped
-                        # silently and the app continues normally.
-                        # ─────────────────────────────────────────────────────
-                        save_to_cloudant(result, st.session_state.user_id)
                         
                         st.rerun()
 
@@ -1748,185 +1642,19 @@ elif view == "history":
     st.markdown("""
     <h2 style='font-size:28px !important;margin-bottom:8px;'>⟳ &nbsp;History</h2>
     <p style='color:#849495;margin-bottom:32px;'>
-        Previous modernization sessions are listed below.
+        History tracking is not available in this version.
     </p>
     """, unsafe_allow_html=True)
     
-    if not cloudant_client:
-        st.markdown("""
-        <div class='cyber-panel' style='padding:40px;text-align:center;'>
-            <div style='color:#849495;font-size:32px;margin-bottom:16px;'>◎</div>
-            <div style='color:#94A3B8;font-size:14px;'>HISTORY_TRACKING_DISABLED</div>
-            <div style='color:#849495;font-size:12px;margin-top:6px;'>
-                Configure IBM Cloudant to enable history tracking.
-            </div>
+    st.markdown("""
+    <div class='cyber-panel' style='padding:40px;text-align:center;'>
+        <div style='color:#849495;font-size:32px;margin-bottom:16px;'>◎</div>
+        <div style='color:#94A3B8;font-size:14px;'>HISTORY_TRACKING_DISABLED</div>
+        <div style='color:#849495;font-size:12px;margin-top:6px;'>
+            History tracking has been removed from this version.
         </div>
-        """, unsafe_allow_html=True)
-    else:
-        user_id = st.session_state.get('user_id', 'anonymous')
-        history = cloudant_client.get_user_history(user_id, limit=20)
-
-        if not history:
-            st.markdown("""
-            <div class='cyber-panel' style='padding:40px;text-align:center;'>
-                <div style='color:#849495;font-size:32px;margin-bottom:16px;'>◎</div>
-                <div style='color:#94A3B8;font-size:14px;'>NO_SESSIONS_FOUND</div>
-                <div style='color:#849495;font-size:12px;margin-top:6px;'>
-                    Upload a SQL file on the Modernize tab to get started.
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            for s_idx, session in enumerate(history):
-                timestamp = session.get('timestamp', '')[:19].replace('T', ' ')
-                filename = session.get('input', {}).get('filename', 'unknown.sql')
-                file_size = session.get('input', {}).get('file_size', 0)
-                table_count = session.get('processing', {}).get('table_count', 0)
-                column_count = session.get('processing', {}).get('column_count', 0)
-                transformation_count = session.get('processing', {}).get('transformation_count', 0)
-                processing_time = session.get('processing', {}).get('processing_time_ms', 0)
-
-                with st.expander(f"🗂️ {filename} — {timestamp}"):
-                    # ── Metrics row ───────────────────────────────────────────
-                    col1, col2, col3, col4 = st.columns(4)
-
-                    with col1:
-                        st.markdown(f"""
-                        <div class='cyber-panel' style='padding:12px;text-align:center;'>
-                            <div style='color:#849495;font-size:10px;letter-spacing:0.1em;'>TABLES</div>
-                            <div style='color:#00F5FF;font-size:20px;font-weight:700;margin-top:4px;'>{table_count}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    with col2:
-                        st.markdown(f"""
-                        <div class='cyber-panel' style='padding:12px;text-align:center;'>
-                            <div style='color:#849495;font-size:10px;letter-spacing:0.1em;'>COLUMNS</div>
-                            <div style='color:#00F5FF;font-size:20px;font-weight:700;margin-top:4px;'>{column_count}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    with col3:
-                        st.markdown(f"""
-                        <div class='cyber-panel' style='padding:12px;text-align:center;'>
-                            <div style='color:#849495;font-size:10px;letter-spacing:0.1em;'>TRANSFORMS</div>
-                            <div style='color:#00F5FF;font-size:20px;font-weight:700;margin-top:4px;'>{transformation_count}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    with col4:
-                        st.markdown(f"""
-                        <div class='cyber-panel' style='padding:12px;text-align:center;'>
-                            <div style='color:#849495;font-size:10px;letter-spacing:0.1em;'>TIME (MS)</div>
-                            <div style='color:#00F5FF;font-size:20px;font-weight:700;margin-top:4px;'>{processing_time}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    # ── Table transformations ─────────────────────────────────
-                    st.markdown("<div style='margin-top:16px;'></div>", unsafe_allow_html=True)
-                    st.markdown("""
-                    <div style='font-size:10px;letter-spacing:0.1em;color:#849495;
-                                font-weight:700;margin-bottom:8px;'>
-                        TABLE TRANSFORMATIONS
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    hist_tables = session.get('output', {}).get('tables', [])
-                    for table in hist_tables:
-                        original = table.get('original_name', '')
-                        clean = table.get('clean_name', '')
-                        st.markdown(f"""
-                        <div style='background:#1E293B;padding:8px 12px;margin:4px 0;
-                                    border-left:2px solid #00F5FF;font-size:12px;'>
-                            <code style='color:#849495;'>{original}</code>
-                            <span style='color:#849495;margin:0 8px;'>→</span>
-                            <code style='color:#00F5FF;'>{clean}</code>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    # ── Transformation details ────────────────────────────────
-                    transformations = session.get('transformations', [])
-                    if transformations:
-                        st.markdown("""
-                        <div style='font-size:10px;letter-spacing:0.1em;color:#849495;
-                                    font-weight:700;margin:16px 0 8px;'>
-                            TRANSFORMATION LOG
-                        </div>
-                        """, unsafe_allow_html=True)
-                        tlog_rows = ""
-                        for tr in transformations[:20]:
-                            tr_type = tr.get('type', 'unknown')
-                            tr_original = tr.get('original', '')
-                            tr_result = tr.get('result', '')
-                            type_color = "#10B981" if tr_type == "table" else "#3B82F6" if tr_type == "column" else "#A855F7"
-                            tlog_rows += f"""
-                            <tr>
-                                <td style='color:{type_color};font-size:11px;font-weight:600;padding:6px 8px;
-                                           border-bottom:1px solid #192121;'>{tr_type}</td>
-                                <td style='color:#849495;font-size:11px;padding:6px 8px;
-                                           border-bottom:1px solid #192121;'>{tr_original}</td>
-                                <td style='color:#849495;font-size:11px;padding:6px 8px;
-                                           border-bottom:1px solid #192121;text-align:center;'>→</td>
-                                <td style='color:#dce4e4;font-size:11px;padding:6px 8px;
-                                           border-bottom:1px solid #192121;'>{tr_result}</td>
-                            </tr>
-                            """
-                        if len(transformations) > 20:
-                            tlog_rows += f"""
-                            <tr>
-                                <td colspan='4' style='color:#849495;font-size:11px;padding:8px;
-                                                       text-align:center;'>
-                                    …and {len(transformations) - 20} more
-                                </td>
-                            </tr>
-                            """
-                        st.html(f"""
-                        <div style='background:#192121;border:1px solid #2e3637;max-height:300px;overflow-y:auto;'>
-                            <table style='width:100%;border-collapse:collapse;font-family:JetBrains Mono,monospace;'>
-                                <thead>
-                                    <tr>
-                                        <th style='color:#94A3B8;text-align:left;font-size:10px;letter-spacing:0.1em;
-                                                   font-weight:700;padding:8px;border-bottom:1px solid #2e3637;'>TYPE</th>
-                                        <th style='color:#94A3B8;text-align:left;font-size:10px;letter-spacing:0.1em;
-                                                   font-weight:700;padding:8px;border-bottom:1px solid #2e3637;'>ORIGINAL</th>
-                                        <th style='width:30px;border-bottom:1px solid #2e3637;'></th>
-                                        <th style='color:#94A3B8;text-align:left;font-size:10px;letter-spacing:0.1em;
-                                                   font-weight:700;padding:8px;border-bottom:1px solid #2e3637;'>RESULT</th>
-                                    </tr>
-                                </thead>
-                                <tbody>{tlog_rows}</tbody>
-                            </table>
-                        </div>
-                        """)
-
-                    # ── Session metadata ──────────────────────────────────────
-                    st.markdown(f"""
-                    <div style='margin-top:16px;color:#849495;font-size:11px;'>
-                        <span>File size: {file_size:,} bytes</span>
-                        &nbsp;|&nbsp;
-                        <span>Session ID: {session.get('session_id', 'N/A')}</span>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    # ── Download ZIP button ───────────────────────────────────
-                    hist_files = session.get('generated_file_contents', {})
-                    if hist_files:
-                        hist_zip = ZipPackager().create_zip(hist_files)
-                        st.download_button(
-                            "⬇  DOWNLOAD PROJECT (ZIP)",
-                            data=hist_zip,
-                            file_name=f"legacylink_{filename.replace('.sql','')}.zip",
-                            mime="application/zip",
-                            use_container_width=True,
-                            key=f"dl_hist_zip_{s_idx}",
-                        )
-                    else:
-                        st.markdown("""
-                        <div style='margin-top:12px;color:#849495;font-size:11px;font-style:italic;'>
-                            ZIP not available for sessions saved before file content tracking was enabled.
-                        </div>
-                        """, unsafe_allow_html=True)
-
+    </div>
+    """, unsafe_allow_html=True)
 # ══════════════════════════════════════════════════════════════════════════════
 # DOCS VIEW
 # ══════════════════════════════════════════════════════════════════════════════

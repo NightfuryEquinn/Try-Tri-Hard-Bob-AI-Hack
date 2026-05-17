@@ -1,6 +1,5 @@
 """Storage module for LegacyLink AI"""
-from .cloudant_client import CloudantClient
 
-__all__ = ['CloudantClient']
+__all__ = []
 
 # Made with Bob

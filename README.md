@@ -45,79 +45,6 @@ streamlit run app.py
 
 4. Open your browser to `http://localhost:8501`
 
-## 🗄️ Optional: Enable History Tracking with IBM Cloudant
-
-LegacyLink AI can save your modernization history to IBM Cloudant NoSQL database for tracking and analytics.
-
-> **Note**: This feature is **completely optional**. The application works perfectly without Cloudant configured.
-
-### Quick Setup
-
-1. **Create IBM Cloud Account** - Visit [cloud.ibm.com](https://cloud.ibm.com)
-2. **Create Cloudant Service** - Use the free Lite plan
-3. **Configure Environment Variables**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your Cloudant credentials
-   ```
-4. **Restart Application**:
-   ```bash
-   streamlit run app.py
-   ```
-
-### Features with History Tracking Enabled
-
-When Cloudant is configured, you get:
-
-- ✅ **Automatic Session Saving** - Every SQL modernization is saved
-- ✅ **Processing History** - View all your past sessions
-- ✅ **Transformation Tracking** - Detailed logs of all changes
-- ✅ **Usage Analytics** - Statistics across all sessions
-- ✅ **Session Replay** - Retrieve and review previous work
-
-### Detailed Documentation
-
-📖 **[Complete Setup Guide](docs/CLOUDANT_SETUP.md)** - Step-by-step instructions with screenshots
-
-🔧 **[Technical Integration Guide](docs/CLOUDANT_INTEGRATION.md)** - Architecture, API reference, and development details
-
-### Verification
-
-Run tests to verify your Cloudant integration:
-```bash
-pytest tests/test_cloudant_integration.py -v
-```
-
-Expected output: `12 passed` ✅
-
-### Privacy & Security
-
-- User IDs are anonymous session identifiers
-- No personal information is stored
-- Credentials stored in `.env` (not committed to git)
-- All connections use HTTPS and IAM authentication
-
-### Cost Estimation
-
-**IBM Cloudant Lite Plan (Free):**
-- 1 GB storage
-- 20 lookups/sec, 10 writes/sec
-- Perfect for development and demos
-- **Recommended for hackathon**
-
-**Typical Usage:**
-- Each session: ~5-50 KB
-- 100 sessions/day: ~75 MB/month
-- **Free tier is sufficient for most use cases**
-
-### Troubleshooting
-
-If you see "Could not save to history" warnings:
-1. Verify credentials in `.env` file
-2. Check Cloudant service status in IBM Cloud
-3. Run `pytest tests/test_cloudant_integration.py` to diagnose
-4. See [CLOUDANT_SETUP.md](docs/CLOUDANT_SETUP.md#troubleshooting) for detailed help
-
 ## 📖 Usage
 
 1. **Upload SQL File**: Click the file uploader and select your legacy SQL schema file
@@ -142,11 +69,9 @@ legacylink-ai/
 ├── examples/                       # Example SQL files
 │   └── legacy_customer_schema.sql
 ├── config/                         # Configuration modules
-│   ├── __init__.py
-│   └── cloudant_config.py         # Cloudant configuration
+│   └── __init__.py
 ├── storage/                        # Storage modules
-│   ├── __init__.py
-│   └── cloudant_client.py         # Cloudant NoSQL client
+│   └── __init__.py
 ├── parser/                         # SQL parsing modules
 │   ├── __init__.py
 │   ├── sql_parser.py
@@ -161,8 +86,7 @@ legacylink-ai/
 │   └── zip_packager.py
 ├── templates/                      # Code templates
 └── tests/                          # Test files
-    ├── test_normalization.py
-    └── test_cloudant_integration.py
+    └── test_normalization.py
 ```
 
 ## 🔧 Supported SQL Features (MVP)
