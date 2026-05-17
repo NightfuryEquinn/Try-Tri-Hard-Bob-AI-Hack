@@ -119,22 +119,25 @@ For more information, see `modernization_report.md`.
         return readme
     
     def generate_modernization_report(self, tables: List[Dict], transformation_log: List[Dict],
-                                     functions: Optional[List[Dict]] = None, indexes: Optional[List[Dict]] = None) -> str:
+                                     functions: Optional[List[Dict]] = None, indexes: Optional[List[Dict]] = None,
+                                     views: Optional[List[Dict]] = None) -> str:
         """
         Generate detailed modernization report
-        
+
         Args:
             tables: List of table dictionaries
             transformation_log: List of transformation records
             functions: List of function/procedure dictionaries (optional)
             indexes: List of index dictionaries (optional)
-            
+            views: List of view dictionaries (optional)
+
         Returns:
             Complete modernization_report.md content
         """
         functions = functions or []
         indexes = indexes or []
-        
+        views = views or []
+
         report = f"""# Modernization Report
 
 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
@@ -149,6 +152,7 @@ This report documents the transformation of legacy SQL schema into modern SQLAlc
 - **Total Columns:** {sum(len(table['columns']) for table in tables)}
 - **Functions/Procedures Found:** {len(functions)}
 - **Indexes Found:** {len(indexes)}
+- **Views Found:** {len(views)}
 - **Transformations Applied:** {len(transformation_log)}
 
 ## Table Transformations
@@ -158,6 +162,8 @@ This report documents the transformation of legacy SQL schema into modern SQLAlc
 {self._generate_functions_section(functions)}
 
 {self._generate_indexes_section(indexes)}
+
+{self._generate_views_section(views)}
 
 ## Detailed Transformation Log
 
@@ -170,13 +176,17 @@ The following SQL types were mapped to SQLAlchemy types:
 | SQL Type | SQLAlchemy Type | Python Type |
 |----------|----------------|-------------|
 | INT, INTEGER | Integer | int |
-| VARCHAR(n) | String(n) | str |
+| BIGINT, BIGSERIAL | BigInteger | int |
+| SMALLINT | SmallInteger | int |
+| VARCHAR(n), CHAR(n) | String(n) | str |
 | TEXT | Text | str |
 | TIMESTAMP, DATETIME | DateTime | datetime |
 | DATE | Date | datetime |
-| BOOLEAN, BOOL | Boolean | bool |
+| BOOLEAN, BOOL, BIT | Boolean | bool |
 | DECIMAL, NUMERIC | Numeric | float |
-| FLOAT, DOUBLE | Float | float |
+| FLOAT, DOUBLE, REAL | Float | float |
+| UUID | UUID | str |
+| JSON, JSONB | JSON | dict |
 
 ## Naming Conventions Applied
 
@@ -417,6 +427,37 @@ __table_args__ = (
 
 """
         
+        return section
+
+    def _generate_views_section(self, views: List[Dict]) -> str:
+        """Generate section documenting legacy views"""
+        if not views:
+            return ""
+
+        materialized = [v for v in views if v.get('materialized')]
+        regular = [v for v in views if not v.get('materialized')]
+
+        section = f"""## Legacy Views
+
+**Found {len(views)} view(s) in the legacy schema** ({len(materialized)} materialized, {len(regular)} regular).
+
+"""
+        if materialized:
+            section += "### Materialized Views\n\n"
+            for v in materialized:
+                section += f"- `{v['name']}`\n"
+            section += "\n"
+
+        if regular:
+            section += "### Regular Views\n\n"
+            for v in regular:
+                section += f"- `{v['name']}`\n"
+            section += "\n"
+
+        section += """**Note:** Views are not directly converted to ORM models.
+They represent query logic that should be implemented as Python query functions or SQLAlchemy hybrid properties.
+
+"""
         return section
 
 # Made with Bob

@@ -52,7 +52,9 @@ class FunctionGenerator:
         Returns:
             Python function code
         """
-        func_name = func['name'].lower()
+        # Strip schema prefix from function name if present
+        raw_name = func['name']
+        func_name = raw_name.split('.')[-1].lower() if '.' in raw_name else raw_name.lower()
         params = func.get('parameters', '')
         returns = func.get('returns', 'Any')
         

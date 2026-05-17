@@ -46,8 +46,10 @@ class IndexGenerator:
         
         # Generate index definitions grouped by table
         for table, table_indexes in indexes_by_table.items():
+            # Create valid Python variable name (replace dots with underscores)
+            var_name = table.replace('.', '_').upper()
             code.append(f"# Indexes for {table} table")
-            code.append(f"{table.upper()}_INDEXES = (")
+            code.append(f"{var_name}_INDEXES = (")
             
             for idx in table_indexes:
                 index_def = self._generate_index_definition(idx)
@@ -101,12 +103,14 @@ class IndexGenerator:
         # Show example for first table
         if indexes_by_table:
             first_table = list(indexes_by_table.keys())[0]
-            instructions.append(f'class {first_table.title()}(Base):')
-            instructions.append('    __tablename__ = "' + first_table.lower() + '"')
+            var_name = first_table.replace('.', '_').upper()
+            display_name = first_table.split('.')[-1] if '.' in first_table else first_table
+            instructions.append(f'class {display_name.title()}(Base):')
+            instructions.append('    __tablename__ = "' + display_name.lower() + '"')
             instructions.append('    ')
             instructions.append('    # ... column definitions ...')
             instructions.append('    ')
-            instructions.append(f'    __table_args__ = {first_table.upper()}_INDEXES')
+            instructions.append(f'    __table_args__ = {var_name}_INDEXES')
             instructions.append('')
         
         instructions.append('Or combine with other table arguments:')
