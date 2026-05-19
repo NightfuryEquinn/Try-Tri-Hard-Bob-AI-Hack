@@ -2,11 +2,19 @@
 
 **IBM Bob-assisted legacy SQL schema modernization into clean Python ORM codebases**
 
-Built for the IBM Bob Hackathon by lablab.ai.
+Built for the IBM Bob Hackathon by lablab.ai (48 hours)
+
+Developed by Yip Zi Xian, Jason Chee Zhao De, and Helen Cheng Kei Kei
 
 ## Overview
 
 LegacyLink AI is a lightweight modernization tool that converts messy legacy SQL schema files into clean, modern Python ORM project scaffolds. It helps developers understand old database systems faster, reduces repetitive ORM coding, and improves documentation and test readiness.
+
+## Demo Video
+https://github.com/user-attachments/assets/97bd8601-50bc-41e1-8e28-3d9f25539c4c
+
+## Presentation Slides
+[Try-Tri-Hard-LegacyLink-AI-Presentation-Slide.pdf](https://github.com/user-attachments/files/27984067/Try-Tri-Hard-LegacyLink-AI-Presentation-Slide.pdf)
 
 ## Features
 
